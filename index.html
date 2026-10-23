@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>JASAN Móvil</title>
+<meta name="description" content="JASAN en tu celular: envías el pedido y tu computadora con JASAN lo hace.">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="JASAN">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="format-detection" content="telephone=no">
+<meta name="referrer" content="no-referrer">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+:root{
+  --bg:#F2F2F7; --card:#FFFFFF; --card2:#F7F7FA; --text:#0B0B0F; --sub:#6E6E73; --sep:rgba(60,60,67,.14);
+  --blue:#2563EB; --blue2:#5B9BF8; --blueSoft:rgba(37,99,235,.10); --green:#22A653; --greenSoft:rgba(34,166,83,.12);
+  --orange:#F97316; --orangeSoft:rgba(249,115,22,.12); --red:#E5484D; --redSoft:rgba(229,72,77,.12);
+  --bar:rgba(242,242,247,.78); --shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(16,24,40,.06);
+  --r:16px; --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --safeT:env(safe-area-inset-top,0px); --safeB:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#000; --card:#1C1C1E; --card2:#2C2C2E; --text:#F5F5F7; --sub:#98989F; --sep:rgba(84,84,88,.45);
+    --blue:#4C8DFF; --blueSoft:rgba(76,141,255,.16); --bar:rgba(18,18,20,.78); --shadow:none;
+    --greenSoft:rgba(48,209,88,.16); --green:#30D158; --orangeSoft:rgba(255,159,10,.16); --redSoft:rgba(255,69,58,.16)}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased;
+  font-size:17px;line-height:1.35;overscroll-behavior-y:none}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+.hide{display:none!important}
+
+/* ------------------------------------------------ splash */
+#splash{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(120% 80% at 50% 40%,#FFFFFF 0%,#EEF3FF 55%,#E3EBFF 100%);transition:opacity .55s ease,visibility .55s}
+@media (prefers-color-scheme: dark){#splash{background:radial-gradient(120% 80% at 50% 40%,#101a33 0%,#070b16 60%,#000 100%)}}
+#splash.out{opacity:0;visibility:hidden}
+.mk{width:118px;height:118px;filter:drop-shadow(0 18px 30px rgba(37,99,235,.35))}
+.mk .side,.mk .base{transform-origin:58% 42%;animation:extrude .7s cubic-bezier(.2,.8,.2,1) .15s both}
+.mk .face{transform-origin:58% 42%;animation:pop .75s cubic-bezier(.2,1.25,.3,1) both}
+.mk .j{stroke-dasharray:100;stroke-dashoffset:100;animation:draw .8s cubic-bezier(.65,0,.35,1) .45s forwards}
+.mk .shine{animation:shine 1.4s ease .9s both}
+@keyframes pop{0%{transform:scale(.55);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes extrude{0%{transform:translate(8px,-8px);opacity:0}100%{transform:none;opacity:1}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes shine{0%{transform:translateX(-120px);opacity:0}30%{opacity:.9}100%{transform:translateX(140px);opacity:0}}
+.wm{margin-top:26px;font-size:30px;font-weight:700;letter-spacing:.32em;padding-left:.32em;opacity:0;transform:translateY(8px);
+  animation:rise .6s ease 1s forwards}
+.wm small{display:block;text-align:center;font-size:13px;font-weight:500;letter-spacing:.24em;color:var(--sub);margin-top:6px}
+@keyframes rise{to{opacity:1;transform:none}}
+.dots{margin-top:34px;display:flex;gap:7px;opacity:0;animation:rise .4s ease 1.3s forwards}
+.dots i{width:7px;height:7px;border-radius:50%;background:var(--blue);opacity:.25;animation:dot 1s ease-in-out infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes dot{50%{opacity:1;transform:scale(1.25)}}
+@media (prefers-reduced-motion: reduce){.mk *,.wm,.dots{animation-duration:.01s!important;animation-delay:0s!important}}
+
+/* ------------------------------------------------ estructura */
+#app{min-height:100%;padding-bottom:calc(84px + var(--safeB))}
+.view{display:none;padding:0 16px calc(24px) ;max-width:640px;margin:0 auto;animation:fade .28s ease}
+.view.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.top{position:sticky;top:0;z-index:5;margin:0 -16px;padding:calc(10px + var(--safeT)) 16px 8px;background:var(--bar);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);display:flex;align-items:center;
+  min-height:calc(44px + var(--safeT));border-bottom:.5px solid transparent;transition:border-color .2s}
+.top.scrolled{border-bottom-color:var(--sep)}
+.top .ttl{flex:1;text-align:center;font-weight:600;font-size:17px;opacity:0;transition:opacity .2s}
+.top.scrolled .ttl{opacity:1}
+.top .bk{color:var(--blue);display:flex;align-items:center;gap:2px;font-size:17px;min-width:70px}
+.top .bk svg{width:12px;height:20px}
+.top .rt{min-width:70px;text-align:right}
+h1.big{font-size:34px;font-weight:700;letter-spacing:-.02em;margin:6px 0 4px}
+.lead{color:var(--sub);margin:0 0 18px;font-size:15px}
+
+.sec{margin:22px 0 8px 16px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub)}
+.foot{margin:8px 16px 0;font-size:13px;color:var(--sub)}
+.list{background:var(--card);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
+.row{display:flex;align-items:center;gap:13px;padding:11px 16px;min-height:52px;width:100%;text-align:left;position:relative}
+.row+.row::before{content:"";position:absolute;top:0;left:62px;right:0;height:.5px;background:var(--sep)}
+.list.plain .row+.row::before{left:16px}
+button.row:active{background:var(--card2)}
+.ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex:none;color:#fff}
+.ic svg{width:19px;height:19px}
+.row .tx{flex:1;min-width:0}
+.row .tx b{display:block;font-weight:500;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .tx span{display:block;font-size:13px;color:var(--sub);margin-top:1px}
+.chev{width:8px;height:14px;color:#C4C4C7;flex:none}
+.tag{font-size:12px;font-weight:600;padding:3px 8px;border-radius:99px;background:var(--card2);color:var(--sub);flex:none}
+.tag.b{background:var(--blueSoft);color:var(--blue)}
+.dim .ic{opacity:.55}.dim .tx b{color:var(--sub)}
+
+/* tarjeta de estado de la PC */
+.pc{display:flex;align-items:center;gap:14px;background:var(--card);border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow)}
+.pc .led{width:12px;height:12px;border-radius:50%;background:#B8B8BD;flex:none;position:relative}
+.pc.on .led{background:var(--green)}
+.pc.on .led::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:2px solid var(--green);opacity:0;animation:ping 2s ease-out infinite}
+@keyframes ping{0%{transform:scale(.6);opacity:.7}100%{transform:scale(1.5);opacity:0}}
+.pc b{display:block;font-weight:600;font-size:16px}.pc span{font-size:13px;color:var(--sub)}
+
+/* hero */
+.hero{position:relative;overflow:hidden;border-radius:22px;padding:20px;color:#fff;margin-top:6px;
+  background:linear-gradient(135deg,#5B9BF8 0%,#2563EB 55%,#1E3A8A 100%);box-shadow:0 12px 30px rgba(37,99,235,.28)}
+.hero h3{margin:0 0 4px;font-size:21px;font-weight:700;letter-spacing:-.01em}
+.hero p{margin:0 0 16px;font-size:14px;opacity:.9;max-width:80%}
+.hero .go{background:#fff;color:#1E3A8A;font-weight:600;font-size:15px;padding:10px 16px;border-radius:99px;display:inline-flex;gap:6px;align-items:center}
+.hero svg.deco{position:absolute;right:-18px;bottom:-22px;width:130px;opacity:.18}
+
+/* formularios */
+.field{display:flex;align-items:center;gap:12px;padding:12px 16px;min-height:50px;position:relative}
+.field+.field::before{content:"";position:absolute;top:0;left:16px;right:0;height:.5px;background:var(--sep)}
+.field label{flex:none;width:118px;font-size:16px}
+.field input,.field select,.field textarea{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:16px;text-align:right;color:var(--text)}
+.field select{direction:rtl;-webkit-appearance:none;appearance:none;color:var(--blue)}
+.field.col{flex-direction:column;align-items:stretch;gap:6px}
+.field.col label{width:auto;font-size:13px;color:var(--sub)}
+.field textarea{text-align:left;resize:none;min-height:76px;line-height:1.4}
+.sw{position:relative;width:51px;height:31px;flex:none}
+.sw input{opacity:0;position:absolute;inset:0;margin:0;z-index:1}
+.sw i{position:absolute;inset:0;border-radius:99px;background:#E9E9EA;transition:background .25s}
+@media (prefers-color-scheme: dark){.sw i{background:#39393D}}
+.sw i::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;
+  box-shadow:0 3px 8px rgba(0,0,0,.15),0 1px 1px rgba(0,0,0,.16);transition:transform .25s cubic-bezier(.3,1.3,.5,1)}
+.sw input:checked+i{background:#34C759}.sw input:checked+i::after{transform:translateX(20px)}
+.stepper{display:flex;align-items:center;background:var(--card2);border-radius:9px;overflow:hidden;flex:none}
+.stepper button{width:40px;height:32px;font-size:20px;color:var(--text)}
+.stepper output{min-width:36px;text-align:center;font-variant-numeric:tabular-nums;font-weight:600}
+
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;padding:26px 18px;
+  border:1.5px dashed rgba(37,99,235,.45);border-radius:var(--r);background:var(--blueSoft);color:var(--blue);width:100%}
+.drop svg{width:34px;height:34px}
+.drop b{font-weight:600;font-size:16px}.drop span{font-size:13px;color:var(--sub)}
+.file{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:var(--r);padding:12px 14px;box-shadow:var(--shadow)}
+.file i.xl{font-style:normal;}.file .xl{width:38px;height:46px;border-radius:7px;background:#1D7044;color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;flex:none}
+.file .xl.pdf{background:#D93025}.file .xl.doc{background:#2B579A}.file .xl.txt{background:#6E6E73}
+.file .tx{flex:1;min-width:0}.file .tx b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:14px;font-weight:500;overflow:hidden;word-break:break-word;line-height:1.25}
+.file .tx span{font-size:13px;color:var(--sub)}
+.link{color:var(--blue);font-size:15px;font-weight:500;padding:6px 4px}
+
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:52px;border-radius:14px;background:var(--blue);color:#fff;
+  font-size:17px;font-weight:600;transition:transform .12s,opacity .2s}
+.btn:active{transform:scale(.98)}.btn[disabled]{opacity:.4}
+.btn.gray{background:var(--card);color:var(--blue);box-shadow:var(--shadow)}
+.btn.red{background:var(--card);color:var(--red);box-shadow:var(--shadow)}
+.spin{width:20px;height:20px;border-radius:50%;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* resultados */
+.res{background:var(--card);border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:12px}
+.res .hd{display:flex;align-items:center;gap:10px}
+.res .hd b{flex:1;font-size:16px;font-weight:600}
+.res .when{font-size:12px;color:var(--sub)}
+.res p{margin:6px 0 0;font-size:14px;color:var(--sub)}
+.res .files{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.st{font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;display:inline-flex;align-items:center;gap:5px}
+.st.listo{background:var(--greenSoft);color:var(--green)}.st.observado{background:var(--orangeSoft);color:var(--orange)}
+.st.error{background:var(--redSoft);color:var(--red)}.st.espera,.st.trabajando{background:var(--blueSoft);color:var(--blue)}
+.st .mini{width:10px;height:10px;border-width:2px;border-color:rgba(37,99,235,.25);border-top-color:var(--blue)}
+.bar{height:4px;border-radius:9px;background:var(--card2);overflow:hidden;margin-top:12px}
+.bar i{display:block;height:100%;width:40%;border-radius:9px;background:linear-gradient(90deg,var(--blue2),var(--blue));animation:slide 1.4s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
+.empty{text-align:center;padding:48px 20px;color:var(--sub)}
+.empty svg{width:56px;height:56px;color:#C4C4C7;margin-bottom:10px}
+.empty b{display:block;color:var(--text);font-size:18px;font-weight:600;margin-bottom:4px}
+
+/* barra de pestañas */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:space-around;padding:7px 0 calc(6px + var(--safeB));
+  background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--sep)}
+.tabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;font-weight:500;color:#8E8E93;position:relative}
+.tabs button.on{color:var(--blue)}
+.tabs svg{width:26px;height:26px}
+.tabs .badge{position:absolute;top:-2px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;font-weight:600;display:grid;place-items:center}
+
+/* hoja inferior y avisos */
+.scrim{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.32);opacity:0;visibility:hidden;transition:.25s}
+.scrim.on{opacity:1;visibility:visible}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;max-width:640px;margin:0 auto;background:var(--card);border-radius:16px 16px 0 0;
+  padding:8px 20px calc(20px + var(--safeB));transform:translateY(105%);transition:transform .38s cubic-bezier(.2,.9,.2,1)}
+.sheet.on{transform:none}
+.sheet .grab{width:36px;height:5px;border-radius:3px;background:#C7C7CC;margin:0 auto 14px}
+.sheet .sic{width:58px;height:58px;border-radius:15px;display:grid;place-items:center;margin:6px auto 12px;color:#fff}
+.sheet .sic svg{width:30px;height:30px}
+.sheet h3{text-align:center;margin:0 0 6px;font-size:20px}
+.sheet p{text-align:center;margin:0 0 18px;color:var(--sub);font-size:15px}
+.toast{position:fixed;left:50%;top:calc(12px + var(--safeT));z-index:60;transform:translate(-50%,-140%);background:rgba(28,28,30,.92);color:#fff;
+  padding:11px 18px;border-radius:99px;font-size:14px;font-weight:500;transition:transform .35s cubic-bezier(.2,1.2,.3,1);max-width:90%;text-align:center;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.toast.on{transform:translate(-50%,0)}
+
+/* vincular / instalar */
+.center{text-align:center;padding-top:calc(30px + var(--safeT))}
+.center .mk{width:84px;height:84px;margin:10px auto 18px;display:block}
+.steps{counter-reset:s;text-align:left}
+.steps .row{align-items:flex-start}
+.steps .row .n{counter-increment:s;width:28px;height:28px;border-radius:50%;background:var(--blueSoft);color:var(--blue);font-weight:700;font-size:14px;display:grid;place-items:center;flex:none;font-style:normal}
+.steps .row .n::before{content:counter(s)}
+.ios-share{display:inline-block;vertical-align:-3px;width:17px;height:17px;color:var(--blue)}
+.who{display:flex;align-items:center;gap:12px}
+.av{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#5B9BF8,#1E3A8A);color:#fff;display:grid;place-items:center;font-weight:600;flex:none}
+</style>
+</head>
+<body>
+
+<!-- ======================= SPLASH ======================= -->
+<div id="splash" aria-hidden="true">
+  <svg class="mk" viewBox="0 0 100 100" aria-hidden="true"><g>
+      <path class="side" d="M15 0 L0 15 L0 100 L15 85 Z" fill="#1D4ED8"/>
+      <path class="base" d="M0 100 L85 100 L100 85 L15 85 Z" fill="#1E3A8A"/>
+      <g class="face"><rect x="15" y="0" width="85" height="85" rx="3" fill="url(#gcara)"/><rect x="15" y="0" width="85" height="85" rx="3" fill="url(#gbri)"/></g>
+      <g clip-path="url(#ccara)"><rect class="shine" x="-10" y="-20" width="34" height="140" fill="url(#gsh)" transform="rotate(18)" opacity="0"/></g>
+      <path class="j" pathLength="100" d="M69.83 17 L69.83 49.3 A12.33 12.33 0 0 1 45.18 49.3" fill="none" stroke="#fff" stroke-width="13.2" stroke-linecap="butt" stroke-linejoin="miter"/>
+</g></svg>
+  <div class="wm">JASAN<small>MÓVIL</small></div>
+  <div class="dots"><i></i><i></i><i></i></div>
+</div>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="gcara" x1="15" y1="0" x2="44.75" y2="85" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#5B9BF8"/><stop offset="1" stop-color="#2563EB"/></linearGradient>
+    <linearGradient id="gbri" x1="0" y1="0" x2="0" y2="42.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="gsh" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <clipPath id="ccara"><rect x="15" y="0" width="85" height="85" rx="3"/></clipPath>
+    <!-- Isotipo JASAN (misma geometría que theme.paint_mark de la PC) -->
+    <g id="mark">
+      <path d="M15 0 L0 15 L0 100 L15 85 Z" fill="#1D4ED8"/>
+      <path d="M0 100 L85 100 L100 85 L15 85 Z" fill="#1E3A8A"/>
+      <rect x="15" y="0" width="85" height="85" rx="3" fill="url(#gcara)"/><rect x="15" y="0" width="85" height="85" rx="3" fill="url(#gbri)"/>
+      <path d="M69.83 17 L69.83 49.3 A12.33 12.33 0 0 1 45.18 49.3" fill="none" stroke="#fff" stroke-width="13.2"/>
+    </g>
+    <symbol id="i-chev" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-back" viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 10.6L12 3.8l8.5 6.8V20a1 1 0 0 1-1 1h-4.8v-6.2H9.3V21H4.5a1 1 0 0 1-1-1z" fill="currentColor"/></symbol>
+    <symbol id="i-tray" viewBox="0 0 24 24"><path d="M4.2 5.4A2 2 0 0 1 6.1 4h11.8a2 2 0 0 1 1.9 1.4L22 12.6V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5.4zM4.3 12.5h4.5a.9.9 0 0 1 .9.8 2.3 2.3 0 0 0 4.6 0 .9.9 0 0 1 .9-.8h4.5L17.9 6H6.1z" fill="currentColor"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8zm8.6 5.3l1.6 1.3-2 3.5-2-.7a7.6 7.6 0 0 1-2 1.2l-.3 2.1h-4l-.4-2.1a7.6 7.6 0 0 1-2-1.2l-2 .7-2-3.5 1.7-1.3a7.8 7.8 0 0 1 0-2.4L3.4 10l2-3.5 2 .8a7.6 7.6 0 0 1 2-1.2L9.8 4h4l.4 2.1a7.6 7.6 0 0 1 2 1.2l2-.8 2 3.5-1.6 1.4a7.8 7.8 0 0 1 0 2.5z" fill="currentColor"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><path d="M4 5h16v14H4z M4 9.5h16 M4 14h16 M9.5 5v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-quote" viewBox="0 0 24 24"><path d="M5 4h10l4 4v12H5z M15 4v4h4 M8 12h8 M8 16h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><path d="M3.5 6h17v12h-17z M3.5 6.5l8.5 6.5 8.5-6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11 M9 12h11 M9 18h11 M4.5 6h.01 M4.5 12h.01 M4.5 18h.01" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z M4 20.5A2.5 2.5 0 0 0 6.5 21H20v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10 M10 20V4 M16 20v-7 M22 20H2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l2.2 6.3L20.5 12l-6.3 2.2L12 20.5l-2.2-6.3L3.5 12l6.3-2.7z" fill="currentColor"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z M10 20.5h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-pc" viewBox="0 0 24 24"><path d="M3 4.5h18v11.5H3z M8.5 20h7 M12 16v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z M14 3v4h4 M9 13h6 M9 17h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 4v16 M6 20h12 M5 8h14 M5 8l-2.5 6a2.5 2.5 0 0 0 5 0z M19 8l-2.5 6a2.5 2.5 0 0 0 5 0z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-word" viewBox="0 0 24 24"><path d="M4 5h16v14H4z M7 9l1.6 6 1.9-5 1.9 5L14 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5z M3 21h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 16V4 M7 9l5-5 5 5 M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v12 M7 11l5 5 5-5 M4 20h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V3 M8 7l4-4 4 4 M6 11H5v10h14V11h-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 8h14v11H5z M9 4h6 M12 11.5v4 M10 13.5h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><path d="M6 11h12v9H6z M8.5 11V8a3.5 3.5 0 0 1 7 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1 M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<div id="app">
+
+<!-- ======================= VINCULAR ======================= -->
+<section class="view" id="v-vincular">
+  <div class="center">
+    <svg class="mk" viewBox="0 0 100 100"><use href="#mark"/></svg>
+    <h1 class="big">JASAN Móvil</h1>
+    <p class="lead">Envía el pedido desde el celular y <b>tu computadora con JASAN</b> lo hace, con tus plantillas y tus firmas.</p>
+  </div>
+  <div class="sec">Para vincular este celular</div>
+  <div class="list steps plain">
+    <div class="row"><i class="n"></i><div class="tx"><b>Abre JASAN en tu computadora</b><span>Entra con tu usuario.</span></div></div>
+    <div class="row"><i class="n"></i><div class="tx"><b>Toca tu nombre → JASAN Móvil</b><span>Aparece tu código QR personal.</span></div></div>
+    <div class="row"><i class="n"></i><div class="tx"><b>Escanéalo con la cámara</b><span>Se abre esta app ya vinculada a ti.</span></div></div>
+  </div>
+  <div class="sec">¿Ya tienes el enlace?</div>
+  <div class="list"><div class="field col"><label for="pegar">Pega aquí el enlace de vinculación que copiaste en JASAN</label>
+    <textarea id="pegar" rows="2" placeholder="https://…/#v=1&amp;t=…" autocapitalize="off" autocomplete="off" spellcheck="false" style="min-height:54px"></textarea></div></div>
+  <div style="margin-top:14px"><button class="btn" id="b-pegar">Vincular</button></div>
+  <p class="foot" style="text-align:center;margin-top:16px">El enlace es personal. No lo compartas.</p>
+</section>
+
+<!-- ======================= INSTALAR ======================= -->
+<section class="view" id="v-instalar">
+  <div class="center">
+    <svg class="mk" viewBox="0 0 100 100"><use href="#mark"/></svg>
+    <h1 class="big" id="ins-hola">¡Listo!</h1>
+    <p class="lead">Este celular quedó vinculado a tu usuario. Agrega JASAN a tu pantalla de inicio para abrirlo como una app.</p>
+  </div>
+  <div id="ins-android" class="hide">
+    <button class="btn" id="b-instalar"><svg width="20" height="20"><use href="#i-down"/></svg>Instalar JASAN</button>
+  </div>
+  <div id="ins-ios" class="hide">
+    <div class="list steps plain">
+      <div class="row"><i class="n"></i><div class="tx"><b>Toca <svg class="ios-share"><use href="#i-share"/></svg> Compartir</b><span>Abajo, en la barra de Safari.</span></div></div>
+      <div class="row"><i class="n"></i><div class="tx"><b>Elige «Agregar a inicio»</b><span>Desliza la lista si no lo ves.</span></div></div>
+      <div class="row"><i class="n"></i><div class="tx"><b>Toca «Agregar»</b><span>El ícono de JASAN aparecerá con tus apps.</span></div></div>
+    </div>
+  </div>
+  <div id="ins-otro" class="hide"><p class="foot" style="text-align:center">Abre el menú del navegador (⋮) y elige «Instalar app» o «Agregar a la pantalla principal».</p></div>
+  <div style="margin-top:14px"><button class="btn gray" id="b-seguir">Seguir en el navegador</button></div>
+</section>
+
+<!-- ======================= INICIO ======================= -->
+<section class="view" id="v-inicio">
+  <div class="top"><div class="rt" style="min-width:70px"></div><div class="ttl">Inicio</div><div class="rt"></div></div>
+  <h1 class="big" id="hola">Hola</h1>
+  <p class="lead" id="hoy"></p>
+  <div class="pc" id="pc"><i class="led"></i><div class="tx" style="flex:1"><b id="pc-t">Buscando tu computadora…</b><span id="pc-s">Un momento</span></div>
+    <svg width="26" height="26" style="color:var(--sub)"><use href="#i-pc"/></svg></div>
+
+  <div class="hero" style="margin-top:16px">
+    <h3>Cuadro de requerimientos</h3>
+    <p>Sube el analítico, escribe la justificación y recibe el cuadro, el desagregado y los PDF.</p>
+    <button class="go" data-ir="cuadro">Empezar <svg width="8" height="14"><use href="#i-chev"/></svg></button>
+    <svg class="deco" viewBox="0 0 100 100"><use href="#mark"/></svg>
+  </div>
+
+  <div class="sec">Desde el celular · lo hace tu PC</div>
+  <div class="list" id="l-cel"></div>
+  <div class="sec">Solo en el celular</div>
+  <div class="list" id="l-solo"></div>
+  <div class="sec">En la computadora</div>
+  <div class="list" id="l-pc"></div>
+  <p class="foot">Estas tareas necesitan la pantalla grande: ábrelas en JASAN de tu computadora.</p>
+</section>
+
+<!-- ======================= CUADRO ======================= -->
+<section class="view" id="v-cuadro">
+  <div class="top"><button class="bk" data-atras><svg><use href="#i-back"/></svg>Inicio</button><div class="ttl">Cuadro</div><div class="rt"></div></div>
+  <h1 class="big">Cuadro de requerimientos</h1>
+  <p class="lead">Tu PC lo revisa como siempre: si el analítico no cuadra, te devuelve las observaciones.</p>
+
+  <div class="sec">Analítico o desagregado</div>
+  <input type="file" id="f-xls" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" class="hide">
+  <button class="drop" id="b-xls"><svg><use href="#i-up"/></svg><b>Elegir el Excel</b><span>.xlsx · hasta 15 MB</span></button>
+  <div class="file hide" id="xls-ok"><i class="xl">XLSX</i><div class="tx"><b id="xls-n"></b><span id="xls-t"></span></div><button class="link" id="b-xls2">Cambiar</button></div>
+
+  <div class="sec">Datos del cuadro</div>
+  <div class="list">
+    <div class="field"><label for="c-mes">Fecha</label>
+      <select id="c-mes"></select><select id="c-anio" style="flex:none;width:76px"></select></div>
+    <div class="field"><label>Numerar desde</label><div style="flex:1"></div>
+      <div class="stepper"><button type="button" id="n-menos" aria-label="Menos">−</button><output id="c-desde">1</output><button type="button" id="n-mas" aria-label="Más">+</button></div></div>
+    <div class="field col"><label for="c-just">Justificación</label>
+      <textarea id="c-just" placeholder="Por ejemplo: RESOLUCIÓN GERENCIAL N° 000093-2026-MDA/GDTI"></textarea></div>
+  </div>
+  <div class="sec">Incluir</div>
+  <div class="list">
+    <div class="field"><label style="flex:1;width:auto">Supervisor</label><span class="sw"><input type="checkbox" id="c-sup" checked><i></i></span></div>
+    <div class="field"><label style="flex:1;width:auto">Residente</label><span class="sw"><input type="checkbox" id="c-res" checked><i></i></span></div>
+    <div class="field"><label style="flex:1;width:auto">PDF de cada Excel</label><span class="sw"><input type="checkbox" id="c-pdf" checked><i></i></span></div>
+  </div>
+  <p class="foot">Las cantidades se quedan con 2 decimales y nada se cambia en el analítico.</p>
+  <div style="margin-top:22px"><button class="btn" id="b-enviar">Enviar a mi PC</button></div>
+  <p class="foot" style="text-align:center;margin-top:12px"><svg width="13" height="13" style="vertical-align:-2px"><use href="#i-lock"/></svg> Viaja cifrado. Solo tu PC lo puede abrir.</p>
+</section>
+
+<!-- ======================= RESULTADOS ======================= -->
+<section class="view" id="v-resultados">
+  <div class="top"><div class="rt" style="min-width:70px"></div><div class="ttl">Resultados</div><div class="rt"></div></div>
+  <h1 class="big">Resultados</h1>
+  <p class="lead">Lo que tu PC terminó. También queda una copia en SALIDAS de tu computadora.</p>
+  <div id="l-res"></div>
+</section>
+
+<!-- ======================= AJUSTES ======================= -->
+<section class="view" id="v-ajustes">
+  <div class="top"><div class="rt" style="min-width:70px"></div><div class="ttl">Ajustes</div><div class="rt"></div></div>
+  <h1 class="big">Ajustes</h1>
+  <div class="list" style="margin-top:12px"><div class="row"><div class="who"><span class="av" id="a-ini">J</span>
+    <div class="tx"><b id="a-nom" style="font-size:17px"></b><span id="a-rol"></span></div></div></div></div>
+  <div class="sec">Este celular</div>
+  <div class="list plain">
+    <div class="row"><div class="tx"><b>Computadora</b></div><span class="tag" id="a-pc">—</span></div>
+    <div class="row"><div class="tx"><b>Vinculado</b></div><span class="tag" id="a-desde">—</span></div>
+    <div class="row"><div class="tx"><b>Resultados guardados</b></div><span class="tag" id="a-n">0</span></div>
+  </div>
+  <div class="sec">Seguridad</div>
+  <div class="list plain">
+    <div class="row"><div class="tx"><b>Cifrado de extremo a extremo</b><span>Tus archivos viajan cerrados con la clave de este celular. Se borran de la nube al descargarlos (o a los 7 días).</span></div></div>
+  </div>
+  <div style="margin-top:22px"><button class="btn gray" id="b-borrar">Borrar resultados del celular</button></div>
+  <div style="margin-top:10px"><button class="btn red" id="b-desv">Desvincular este celular</button></div>
+  <p class="foot" style="text-align:center;margin-top:18px">JASAN Móvil <span id="a-ver"></span> · Municipalidad Distrital de Aucallama</p>
+</section>
+
+</div>
+
+<nav class="tabs hide" id="tabs">
+  <button data-tab="inicio" class="on"><svg><use href="#i-home"/></svg>Inicio</button>
+  <button data-tab="resultados"><svg><use href="#i-tray"/></svg>Resultados<span class="badge hide" id="badge">0</span></button>
+  <button data-tab="ajustes"><svg><use href="#i-gear"/></svg>Ajustes</button>
+</nav>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"><div class="grab"></div><div class="sic" id="sh-ic"></div><h3 id="sh-t"></h3><p id="sh-p"></p>
+  <div id="sh-b"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
