@@ -119,6 +119,7 @@ button.row:active{background:var(--card2)}
 .field{display:flex;align-items:center;gap:12px;padding:12px 16px;min-height:50px;position:relative}
 .field+.field::before{content:"";position:absolute;top:0;left:16px;right:0;height:.5px;background:var(--sep)}
 .field label{flex:none;width:118px;font-size:16px}
+.field input[type=date]{-webkit-appearance:none;appearance:none;color:var(--blue);min-height:22px}
 .field input,.field select,.field textarea{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:16px;text-align:right;color:var(--text)}
 .field select{direction:rtl;-webkit-appearance:none;appearance:none;color:var(--blue)}
 .field.col{flex-direction:column;align-items:stretch;gap:6px}
@@ -382,6 +383,57 @@ button.row:active{background:var(--card2)}
   </div>
   <p class="foot">Las cantidades se quedan con 2 decimales y nada se cambia en el analítico.</p>
   <div style="margin-top:22px"><button class="btn" id="b-enviar">Enviar a mi PC</button></div>
+  <p class="foot" style="text-align:center;margin-top:12px"><svg width="13" height="13" style="vertical-align:-2px"><use href="#i-lock"/></svg> Viaja cifrado. Solo tu PC lo puede abrir.</p>
+</section>
+
+<!-- ======================= REQUERIMIENTOS ======================= -->
+<section class="view" id="v-req">
+  <div class="top"><button class="bk" data-atras><svg><use href="#i-back"/></svg>Inicio</button><div class="ttl">Requerimientos</div><div class="rt"></div></div>
+  <h1 class="big">Requerimientos</h1>
+  <p class="lead">Una carta por cada pestaña del cuadro, con tu macro, tus datos, tu membrete y tus firmas de la PC.</p>
+  <div class="sec">Cuadro de requerimientos (Excel)</div>
+  <button class="file hide" id="ult-req" style="width:100%;text-align:left;margin-bottom:10px;border:1.5px solid var(--blue)"><i class="xl">XLSX</i><div class="tx"><b id="ult-req-n"></b><span>Usar el último cuadro que hiciste desde el celular</span></div><svg width="22" height="22" style="color:var(--blue);flex:none"><use href="#i-check"/></svg></button>
+  <input type="file" id="f-req" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" class="hide">
+  <button class="drop" id="b-req"><svg><use href="#i-up"/></svg><b>Elegir el cuadro</b><span>El Excel con las pestañas reque 01, reque 02…</span></button>
+  <div class="file hide" id="ok-req"><i class="xl">XLSX</i><div class="tx"><b id="n-req"></b><span id="t-req"></span></div><button class="link" id="c-req">Cambiar</button></div>
+  <div class="sec">Datos de las cartas</div>
+  <div class="list">
+    <div class="field"><label for="r-fecha">Fecha</label><input type="date" id="r-fecha"></div>
+    <div class="field col"><label for="r-obra">Obra o actividad</label><input id="r-obra" placeholder="Se toma del Excel" style="text-align:left"></div>
+  </div>
+  <div class="sec">N° de la 1.ª carta</div>
+  <div class="list">
+    <div class="field"><label for="r-cons">Consultora</label><input id="r-cons" placeholder="Sigue la de tu PC" autocapitalize="characters"></div>
+    <div class="field"><label for="r-sup">Supervisor</label><input id="r-sup" placeholder="Sigue la de tu PC" autocapitalize="characters"></div>
+    <div class="field"><label for="r-res">Residente</label><input id="r-res" placeholder="Sigue la de tu PC" autocapitalize="characters"></div>
+  </div>
+  <p class="foot">Déjalos vacíos y JASAN sigue la numeración que tienes en la PC (131, 132, 133…).</p>
+  <div style="margin-top:22px"><button class="btn" id="e-req">Enviar a mi PC</button></div>
+  <p class="foot" style="text-align:center;margin-top:12px"><svg width="13" height="13" style="vertical-align:-2px"><use href="#i-lock"/></svg> Viaja cifrado. Solo tu PC lo puede abrir.</p>
+</section>
+
+<!-- ======================= COTIZACIONES ======================= -->
+<section class="view" id="v-cotiz">
+  <div class="top"><button class="bk" data-atras><svg><use href="#i-back"/></svg>Inicio</button><div class="ttl">Cotizaciones</div><div class="rt"></div></div>
+  <h1 class="big">Cotizaciones</h1>
+  <p class="lead">Los 8 PDF de cada proceso, con los proveedores, firmas y sellos que tienes guardados en la PC.</p>
+  <div class="sec">Excel de cotizaciones</div>
+  <input type="file" id="f-cot" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" class="hide">
+  <button class="drop" id="b-cot"><svg><use href="#i-up"/></svg><b>Elegir el Excel</b><span>El cuadro con los procesos y «SE CONSIDERA»</span></button>
+  <div class="file hide" id="ok-cot"><i class="xl">XLSX</i><div class="tx"><b id="n-cot"></b><span id="t-cot"></span></div><button class="link" id="c-cot">Cambiar</button></div>
+  <div class="sec">Datos</div>
+  <div class="list">
+    <div class="field col"><label for="k-obra">Obra</label><input id="k-obra" placeholder="La última que usaste en la PC" style="text-align:left"></div>
+    <div class="field"><label for="k-cui">CUI</label><input id="k-cui" inputmode="numeric" placeholder="Opcional"></div>
+    <div class="field"><label for="k-sol">Fecha de solicitud</label><input type="date" id="k-sol"></div>
+    <div class="field"><label for="k-mes">Cartas de</label><select id="k-mes"></select><select id="k-anio" style="flex:none;width:76px"></select></div>
+  </div>
+  <div class="sec">Incluir</div>
+  <div class="list">
+    <div class="field"><label style="flex:1;width:auto">Servicios profesionales</label><span class="sw"><input type="checkbox" id="k-prof"><i></i></span></div>
+  </div>
+  <p class="foot">Si a un proveedor le faltan datos, la carta sale y se marca «incompleta»: complétalo en la PC (Proveedores).</p>
+  <div style="margin-top:22px"><button class="btn" id="e-cot">Enviar a mi PC</button></div>
   <p class="foot" style="text-align:center;margin-top:12px"><svg width="13" height="13" style="vertical-align:-2px"><use href="#i-lock"/></svg> Viaja cifrado. Solo tu PC lo puede abrir.</p>
 </section>
 

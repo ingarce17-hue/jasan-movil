@@ -1,5 +1,5 @@
 /* JASAN Móvil · guarda la app para que abra al toque; los datos (nube) nunca se guardan aquí. */
-const CACHE = "jasan-movil-v3";              // cambiar en cada versión: así el celular se actualiza solo
+const CACHE = "jasan-movil-v4";              // cambiar en cada versión: así el celular se actualiza solo
 const APP = ["./", "index.html", "app.js", "manifest.webmanifest", "icons/icon-192.png", "icons/maskable-192.png", "icons/apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(APP)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))

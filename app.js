@@ -5,7 +5,7 @@
      clave   = sha256("jasan-movil-k|"+t) → AES-256-GCM; blob = nonce12 | cifrado | tag16
      rutas   movil/<caja>/pedidos/<id>.bin · resultados/<id>.bin · pc.bin · anulado            */
 "use strict";
-const VERSION = "1.2 (JASAN 2.39.1)";
+const VERSION = "1.3 (JASAN 2.40.0)";
 const BUCKET = "jasan", TOPE_MB = 15, VIVO_SEG = 90;
 const $ = (q, el = document) => el.querySelector(q);
 const $$ = (q, el = document) => [...el.querySelectorAll(q)];
@@ -129,7 +129,7 @@ const UI = {
     $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + id));
     this.actual = id; window.scrollTo(0, 0);
     $("#tabs").classList.toggle("hide", !tab);
-    $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === id || (id === "cuadro" && b.dataset.tab === "inicio")));
+    $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === id || (["cuadro", "req", "cotiz"].includes(id) && b.dataset.tab === "inicio")));
     if (id === "resultados") pintarResultados();
     if (id === "ajustes") pintarAjustes();
   },
@@ -152,9 +152,9 @@ addEventListener("scroll", () => $$(".view.on .top").forEach(t => t.classList.to
 const ACT = {
   cel: [
     ["cuadro", "Cuadro de requerimientos", "Analítico → cuadro, desagregado y PDF", "i-grid", "#2563EB", true, "Cuadro de req."],
-    ["cotiz", "Cotizaciones", "Llenas los datos, tu PC arma el cuadro comparativo", "i-quote", "#0EA5E9", false, "Cotizaciones"],
+    ["cotiz", "Cotizaciones", "Excel del cuadro → los 8 PDF de cada proceso", "i-quote", "#0EA5E9", true, "Cotizaciones"],
     ["cartas", "Cartas con fotos", "Toma las fotos con la cámara", "i-mail", "#14B8A6", false, "Cartas"],
-    ["req", "Requerimientos", "Bienes y servicios", "i-list", "#6366F1", false, "Requerim."],
+    ["req", "Requerimientos", "Cuadro → una carta por pestaña", "i-list", "#6366F1", true, "Requerim."],
     ["tdr", "TDR y EETT", "Términos de referencia y especificaciones", "i-book", "#8B5CF6", false, "TDR y EETT"],
     ["valor", "Informe de valorización", "Con los avances que registras", "i-chart", "#F59E0B", false, "Valorización"],
     ["conf", "Conformidad", "Los datos desde el celular, la firma en la PC", "i-check", "#22A653", false, "Conformidad"]
@@ -190,7 +190,12 @@ function pintarActividades() {
     const el = $(cont); el.innerHTML = ""; ACT[k].forEach(a => el.appendChild(fila(a, k)));
   }
 }
-function abrirActividad(id) { if (id === "cuadro") UI.ver("cuadro", { tab: false, empujar: true }); }
+function abrirActividad(id) {
+  const v = { cuadro: "cuadro", req: "req", cotiz: "cotiz" }[id];
+  if (!v) return;
+  if (v === "req") ultimoCuadro();
+  UI.ver(v, { tab: false, empujar: true });
+}
 document.addEventListener("click", e => {
   const t = e.target.closest("[data-ir]"); if (t) abrirActividad(t.dataset.ir);
   if (e.target.closest("[data-atras]")) UI.atras();
@@ -266,6 +271,96 @@ async function enviarCuadro() {
   } finally { btn.disabled = false; btn.textContent = "Enviar a mi PC"; }
 }
 
+// ---------------------------------------------------------------- envío genérico (requerimientos, cotizaciones)
+const ELEG = {};                     // archivo elegido por formulario: {nombre, datos(Uint8Array), tam}
+function selector(p, aviso) {
+  const elegir = () => $(`#f-${p}`).click();
+  $(`#b-${p}`).onclick = elegir; $(`#c-${p}`).onclick = elegir;
+  $(`#f-${p}`).onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+    if (!/\.(xlsx|xlsm)$/i.test(f.name)) return UI.hoja({ icono: "i-grid", color: "#E5484D", titulo: "Ese no es un Excel", texto: aviso });
+    if (f.size > TOPE_MB * 1048576) return UI.hoja({ icono: "i-grid", color: "#E5484D", titulo: "Archivo muy pesado", texto: `El Excel pasa los ${TOPE_MB} MB.` });
+    ponerArchivo(p, { nombre: f.name, datos: new Uint8Array(await f.arrayBuffer()), tam: f.size });
+  };
+}
+function ponerArchivo(p, a) {
+  ELEG[p] = a;
+  $(`#n-${p}`).textContent = a ? a.nombre : ""; $(`#t-${p}`).textContent = a ? tam(a.tam) + " · listo para enviar" : "";
+  $(`#b-${p}`).classList.toggle("hide", !!a); $(`#ok-${p}`).classList.toggle("hide", !a);
+  if (p === "req") $("#ult-req").classList.add("hide");
+}
+async function enviarPedido({ tipo, p, datos, titulo, boton }) {
+  const a = ELEG[p];
+  if (!a) return UI.toast("Primero elige el Excel");
+  const btn = $(boton); btn.disabled = true; btn.innerHTML = `<i class="spin"></i>Enviando…`;
+  try {
+    const id = nuevoId(), creado = isoLocal();
+    const ped = { tipo, creado, datos, archivos: [{ nombre: a.nombre, b64: b64Enc(a.datos) }] };
+    await Nube.put(ruta(`pedidos/${id}.bin`), await cifrar(ped));
+    await DB.poner({ id, estado: "espera", titulo, resumen: a.nombre, tipo, pedido: creado, archivos: [] });
+    ponerArchivo(p, null);
+    UI.ver("resultados"); verPanel("cel");
+    UI.toast(pcVivo ? "Enviado. Tu PC ya lo está haciendo" : "Enviado. Tu PC lo hará al conectarse", 3200);
+    vigilar(true);
+  } catch (e) {
+    UI.hoja({ icono: "i-up", color: "#E5484D", titulo: "No se pudo enviar",
+      texto: String(e.message) === "permiso" ? "La nube de JASAN todavía no acepta pedidos del celular. Pide a tu administrador que active JASAN Móvil." :
+        navigator.onLine ? "La nube no respondió. Vuelve a intentarlo en un momento." : "No tienes internet. Conéctate y vuelve a intentarlo." });
+  } finally { btn.disabled = false; btn.textContent = "Enviar a mi PC"; }
+}
+const fechaDMY = v => { const m = String(v || "").match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${m[3]}/${m[2]}/${m[1]}` : ""; };
+const hoyISO = () => { const d = new Date(), p = n => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
+const recordar = (k, o) => ponerLS("jasan." + k, JSON.stringify(o));
+const recordado = k => { try { return JSON.parse(leerLS("jasan." + k, "{}")) || {}; } catch { return {}; } };
+
+// ----- Requerimientos
+function prepararReq() {
+  selector("req", "Elige el cuadro de requerimientos en formato .xlsx.");
+  $("#r-fecha").value = hoyISO();
+  const g = recordado("req"); if (g.obra) $("#r-obra").value = g.obra;
+  $("#ult-req").onclick = async () => { const u = await cuadroReciente(); if (u) ponerArchivo("req", u); };
+  $("#e-req").onclick = () => {
+    const datos = { fecha: fechaDMY($("#r-fecha").value), obra: $("#r-obra").value.trim(),
+      n_cons: $("#r-cons").value.trim(), n_sup: $("#r-sup").value.trim(), n_res: $("#r-res").value.trim() };
+    const nums = [datos.n_cons, datos.n_sup, datos.n_res].filter(Boolean).length;
+    if (nums && nums < 3) return UI.toast("Escribe los 3 números o deja los 3 vacíos");
+    recordar("req", { obra: datos.obra });
+    enviarPedido({ tipo: "requerimientos", p: "req", datos, titulo: "Requerimientos", boton: "#e-req" });
+    $("#r-cons").value = $("#r-sup").value = $("#r-res").value = "";
+  };
+}
+async function cuadroReciente() {
+  const l = (await DB.todos()).filter(r => r.tipo === "cuadro" && r.estado === "listo")
+    .sort((a, b) => String(b.pedido).localeCompare(String(a.pedido)));
+  for (const r of l) {
+    const a = (r.archivos || []).find(x => /^CUADRO DE REQUERIMIENTOS.*\.xlsx$/i.test(x.nombre));
+    if (a) { const d = b64Dec(a.b64); return { nombre: a.nombre, datos: d, tam: d.length }; }
+  }
+  return null;
+}
+async function ultimoCuadro() {
+  if (ELEG.req) return;
+  const u = await cuadroReciente();
+  $("#ult-req").classList.toggle("hide", !u);
+  if (u) $("#ult-req-n").textContent = u.nombre;
+}
+
+// ----- Cotizaciones
+function prepararCotiz() {
+  selector("cot", "Elige el Excel de cotizaciones en formato .xlsx.");
+  const hoy = new Date();
+  $("#k-sol").value = hoyISO();
+  $("#k-mes").innerHTML = MESES.map((m, i) => `<option value="${i + 1}"${i === hoy.getMonth() ? " selected" : ""}>${cap(m)}</option>`).join("");
+  $("#k-anio").innerHTML = [-1, 0, 1].map(d => hoy.getFullYear() + d).map(y => `<option${y === hoy.getFullYear() ? " selected" : ""}>${y}</option>`).join("");
+  const g = recordado("cotiz"); if (g.obra) $("#k-obra").value = g.obra; if (g.cui) $("#k-cui").value = g.cui;
+  $("#e-cot").onclick = () => {
+    const datos = { obra: $("#k-obra").value.trim(), cui: $("#k-cui").value.replace(/\D/g, ""), fecha_sol: fechaDMY($("#k-sol").value),
+      mes: +$("#k-mes").value, anio: +$("#k-anio").value, profesionales: $("#k-prof").checked };
+    recordar("cotiz", { obra: datos.obra, cui: datos.cui });
+    enviarPedido({ tipo: "cotizaciones", p: "cot", datos, titulo: "Cotizaciones", boton: "#e-cot" });
+  };
+}
+
 // ---------------------------------------------------------------- resultados
 let vigilando = null;
 async function traerResultados() {
@@ -280,7 +375,7 @@ async function traerResultados() {
       const b = await Nube.get(p); if (!b) continue;
       let r; try { r = await descifrar(b); } catch { await Nube.remove([p]); continue; }
       const prev = locales[id] || {};
-      if (r.estado === "trabajando") { if (prev.estado !== "trabajando") await DB.poner({ ...prev, id, estado: "trabajando", titulo: prev.titulo || "Cuadro de requerimientos" }); continue; }
+      if (r.estado === "trabajando") { if (prev.estado !== "trabajando") await DB.poner({ ...prev, id, estado: "trabajando", titulo: prev.titulo || "Pedido" }); continue; }
       await DB.poner({ ...r, id, nuevo: true, recibido: new Date().toISOString() });
       await Nube.remove([p]);                         // no cargar la nube: ya está en el celular
       nuevos++;
@@ -319,7 +414,9 @@ async function pintarResultados() {
   for (const r of lista) {
     const el = document.createElement("div"); el.className = "res";
     const esperando = r.estado === "espera" || r.estado === "trabajando";
-    const sub = esperando ? (r.estado === "espera" ? (pcVivo ? "Tu PC lo recibe en segundos…" : "Esperando a que tu PC se conecte") : "Revisando el analítico y armando el cuadro…") : r.resumen;
+    const haciendo = { cuadro: "Revisando el analítico y armando el cuadro…", requerimientos: "Armando las cartas con tu macro…",
+      cotizaciones: "Armando los 8 PDF de cada proceso…" }[r.tipo] || "Tu PC lo está haciendo…";
+    const sub = esperando ? (r.estado === "espera" ? (pcVivo ? "Tu PC lo recibe en segundos…" : "Esperando a que tu PC se conecte") : haciendo) : r.resumen;
     el.innerHTML = `<div class="hd"><b>${esc(r.estado === "listo" || r.estado === "observado" ? (r.tipo === "cuadro" ? "Cuadro · " : "") + r.titulo : r.titulo)}</b>
       <span class="st ${r.estado}">${esperando ? '<i class="spin mini"></i>' : ""}${ESTADO[r.estado] || r.estado}</span></div>
       <div class="when">${esc(hace(r.hecho || r.pedido))}</div><p>${esc(sub)}</p>
@@ -343,6 +440,14 @@ async function pintarResultados() {
       c.onclick = () => acciones(r.archivos.map(archivoDe)); pie.appendChild(c);
     }
     el.appendChild(pie);
+    if (r.tipo === "cuadro" && r.estado === "listo") {
+      const h = document.createElement("button"); h.className = "btn gray"; h.style.cssText = "height:42px;font-size:15px;margin-top:10px";
+      h.innerHTML = `<svg width="18" height="18"><use href="#i-list"/></svg>Hacer los requerimientos`;
+      h.onclick = () => { const a = (r.archivos || []).find(x => /^CUADRO DE REQUERIMIENTOS.*\.xlsx$/i.test(x.nombre));
+        if (a) { const d = b64Dec(a.b64); ponerArchivo("req", { nombre: a.nombre, datos: d, tam: d.length }); }
+        UI.ver("req", { tab: false, empujar: true }); };
+      el.appendChild(h);
+    }
     cont.appendChild(el);
   }
   if (lista.some(x => x.nuevo)) { for (const x of lista) if (x.nuevo) { x.nuevo = false; await DB.poner(x); } setTimeout(pintarBadge, 400); }
@@ -532,7 +637,7 @@ $("#b-pegar").onclick = async () => {
 
 let recargando = false;
 async function iniciar() {
-  pintarActividades(); prepararCuadro();
+  pintarActividades(); prepararCuadro(); prepararReq(); prepararCotiz();
   const t0 = Date.now();
   const delEnlace = V.deEnlace(location.hash);
   let v = V.leer();
