@@ -437,6 +437,25 @@ button.row:active{background:var(--card2)}
   <p class="foot" style="text-align:center;margin-top:12px"><svg width="13" height="13" style="vertical-align:-2px"><use href="#i-lock"/></svg> Viaja cifrado. Solo tu PC lo puede abrir.</p>
 </section>
 
+<!-- ======================= A MI PC ======================= -->
+<section class="view" id="v-enviar">
+  <div class="top"><button class="bk" data-atras><svg><use href="#i-back"/></svg>Inicio</button><div class="ttl">A mi PC</div><div class="rt"></div></div>
+  <h1 class="big">A mi PC</h1>
+  <p class="lead">Fotos o archivos del celular directo a tu computadora: quedan en SALIDAS\JASAN Movil\Recibidos y JASAN abre la carpeta.</p>
+  <input type="file" id="f-env" multiple class="hide">
+  <input type="file" id="f-foto" accept="image/*" capture="environment" class="hide">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <button class="drop" id="b-foto" style="padding:18px 10px"><svg><use href="#i-plus"/></svg><b>Tomar foto</b><span>Con la cámara</span></button>
+    <button class="drop" id="b-env" style="padding:18px 10px"><svg><use href="#i-up"/></svg><b>Elegir archivos</b><span>Fotos, PDF, Word, Excel…</span></button>
+  </div>
+  <div id="l-env" style="display:flex;flex-direction:column;gap:8px;margin-top:12px"></div>
+  <p class="foot" id="tot-env"></p>
+  <div class="sec">Nota (opcional)</div>
+  <div class="list"><div class="field col"><textarea id="nota-env" placeholder="Por ejemplo: fotos del avance de la obra para el informe"></textarea></div></div>
+  <div style="margin-top:22px"><button class="btn" id="e-env">Mandar a mi PC</button></div>
+  <p class="foot" style="text-align:center;margin-top:12px"><svg width="13" height="13" style="vertical-align:-2px"><use href="#i-lock"/></svg> Viaja cifrado. Hasta 10 MB por envío.</p>
+</section>
+
 <!-- ======================= RESULTADOS ======================= -->
 <section class="view" id="v-resultados">
   <div class="top"><div class="rt" style="min-width:70px"></div><div class="ttl">Resultados</div><div class="rt"></div></div>

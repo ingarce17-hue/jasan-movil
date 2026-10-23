@@ -5,7 +5,7 @@
      clave   = sha256("jasan-movil-k|"+t) → AES-256-GCM; blob = nonce12 | cifrado | tag16
      rutas   movil/<caja>/pedidos/<id>.bin · resultados/<id>.bin · pc.bin · anulado            */
 "use strict";
-const VERSION = "1.3 (JASAN 2.40.0)";
+const VERSION = "1.4 (JASAN 2.40.1)";
 const BUCKET = "jasan", TOPE_MB = 15, VIVO_SEG = 90;
 const $ = (q, el = document) => el.querySelector(q);
 const $$ = (q, el = document) => [...el.querySelectorAll(q)];
@@ -129,7 +129,7 @@ const UI = {
     $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + id));
     this.actual = id; window.scrollTo(0, 0);
     $("#tabs").classList.toggle("hide", !tab);
-    $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === id || (["cuadro", "req", "cotiz"].includes(id) && b.dataset.tab === "inicio")));
+    $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === id || (["cuadro", "req", "cotiz", "enviar"].includes(id) && b.dataset.tab === "inicio")));
     if (id === "resultados") pintarResultados();
     if (id === "ajustes") pintarAjustes();
   },
@@ -151,6 +151,7 @@ addEventListener("scroll", () => $$(".view.on .top").forEach(t => t.classList.to
 // ---------------------------------------------------------------- actividades (lo que se puede desde el celular)
 const ACT = {
   cel: [
+    ["enviar", "A mi PC", "Fotos o archivos del celular a tu computadora", "i-pc", "#0A84FF", true, "A mi PC"],
     ["cuadro", "Cuadro de requerimientos", "Analítico → cuadro, desagregado y PDF", "i-grid", "#2563EB", true, "Cuadro de req."],
     ["cotiz", "Cotizaciones", "Excel del cuadro → los 8 PDF de cada proceso", "i-quote", "#0EA5E9", true, "Cotizaciones"],
     ["cartas", "Cartas con fotos", "Toma las fotos con la cámara", "i-mail", "#14B8A6", false, "Cartas"],
@@ -191,7 +192,7 @@ function pintarActividades() {
   }
 }
 function abrirActividad(id) {
-  const v = { cuadro: "cuadro", req: "req", cotiz: "cotiz" }[id];
+  const v = { cuadro: "cuadro", req: "req", cotiz: "cotiz", enviar: "enviar" }[id];
   if (!v) return;
   if (v === "req") ultimoCuadro();
   UI.ver(v, { tab: false, empujar: true });
@@ -361,6 +362,49 @@ function prepararCotiz() {
   };
 }
 
+// ----- A mi PC (fotos y archivos)
+const ENV = [];
+const TOPE_ENV = 10 * 1048576;
+function prepararEnviar() {
+  $("#b-foto").onclick = () => $("#f-foto").click();
+  $("#b-env").onclick = () => $("#f-env").click();
+  const agregar = async e => {
+    for (const f of [...e.target.files]) ENV.push({ nombre: f.name || `FOTO ${isoLocal().slice(0, 19).replace(/[T:]/g, "-")}.jpg`, datos: new Uint8Array(await f.arrayBuffer()), tam: f.size });
+    e.target.value = ""; pintarEnviar();
+  };
+  $("#f-env").onchange = agregar; $("#f-foto").onchange = agregar;
+  $("#e-env").onclick = enviarArchivos;
+}
+function pintarEnviar() {
+  const cont = $("#l-env"); cont.innerHTML = "";
+  ENV.forEach((a, i) => {
+    const [c, t] = clase(a.nombre), f = document.createElement("div"); f.className = "file";
+    f.innerHTML = `<i class="xl ${c}">${t}</i><div class="tx"><b>${esc(a.nombre)}</b><span>${tam(a.tam)}</span></div><button class="link" style="color:var(--red)">Quitar</button>`;
+    f.querySelector("button").onclick = () => { ENV.splice(i, 1); pintarEnviar(); };
+    cont.appendChild(f);
+  });
+  const total = ENV.reduce((s, a) => s + a.tam, 0);
+  $("#tot-env").textContent = ENV.length ? `${ENV.length} archivo(s) · ${tam(total)}` + (total > TOPE_ENV ? " · pasa los 10 MB: quita alguno" : "") : "";
+  $("#tot-env").style.color = total > TOPE_ENV ? "var(--red)" : "";
+}
+async function enviarArchivos() {
+  if (!ENV.length) return UI.toast("Elige al menos un archivo o toma una foto");
+  if (ENV.reduce((s, a) => s + a.tam, 0) > TOPE_ENV) return UI.toast("Pasa los 10 MB: quita alguno o mándalos por partes");
+  const btn = $("#e-env"); btn.disabled = true; btn.innerHTML = `<i class="spin"></i>Enviando…`;
+  try {
+    const id = nuevoId(), creado = isoLocal();
+    const ped = { tipo: "archivos", creado, datos: { nota: $("#nota-env").value.trim() }, archivos: ENV.map(a => ({ nombre: a.nombre, b64: b64Enc(a.datos) })) };
+    await Nube.put(ruta(`pedidos/${id}.bin`), await cifrar(ped));
+    await DB.poner({ id, estado: "espera", titulo: "A mi PC", resumen: `${ENV.length} archivo(s)`, tipo: "archivos", pedido: creado, archivos: [] });
+    ENV.length = 0; pintarEnviar(); $("#nota-env").value = "";
+    UI.ver("resultados"); verPanel("cel");
+    UI.toast(pcVivo ? "Enviado. Llega a tu PC en segundos" : "Enviado. Llegará cuando tu PC se conecte", 3200);
+    vigilar(true);
+  } catch (e) {
+    UI.hoja({ icono: "i-up", color: "#E5484D", titulo: "No se pudo enviar", texto: navigator.onLine ? "La nube no respondió. Vuelve a intentarlo." : "No tienes internet." });
+  } finally { btn.disabled = false; btn.textContent = "Mandar a mi PC"; }
+}
+
 // ---------------------------------------------------------------- resultados
 let vigilando = null;
 async function traerResultados() {
@@ -415,7 +459,7 @@ async function pintarResultados() {
     const el = document.createElement("div"); el.className = "res";
     const esperando = r.estado === "espera" || r.estado === "trabajando";
     const haciendo = { cuadro: "Revisando el analítico y armando el cuadro…", requerimientos: "Armando las cartas con tu macro…",
-      cotizaciones: "Armando los 8 PDF de cada proceso…" }[r.tipo] || "Tu PC lo está haciendo…";
+      cotizaciones: "Armando los 8 PDF de cada proceso…", archivos: "Guardándolos en tu PC…" }[r.tipo] || "Tu PC lo está haciendo…";
     const sub = esperando ? (r.estado === "espera" ? (pcVivo ? "Tu PC lo recibe en segundos…" : "Esperando a que tu PC se conecte") : haciendo) : r.resumen;
     el.innerHTML = `<div class="hd"><b>${esc(r.estado === "listo" || r.estado === "observado" ? (r.tipo === "cuadro" ? "Cuadro · " : "") + r.titulo : r.titulo)}</b>
       <span class="st ${r.estado}">${esperando ? '<i class="spin mini"></i>' : ""}${ESTADO[r.estado] || r.estado}</span></div>
@@ -637,7 +681,7 @@ $("#b-pegar").onclick = async () => {
 
 let recargando = false;
 async function iniciar() {
-  pintarActividades(); prepararCuadro(); prepararReq(); prepararCotiz();
+  pintarActividades(); prepararCuadro(); prepararReq(); prepararCotiz(); prepararEnviar();
   const t0 = Date.now();
   const delEnlace = V.deEnlace(location.hash);
   let v = V.leer();
