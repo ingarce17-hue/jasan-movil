@@ -256,6 +256,10 @@ button.row:active{background:var(--card2)}
 .ptr.listo svg{transform:rotate(180deg)}
 .ptr.girando svg{animation:rot .8s linear infinite}
 .ptr svg{transition:transform .2s}
+.thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.thumbs .th{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--card2);display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--sub)}
+.thumbs .th img{width:100%;height:100%;object-fit:cover}
+.thumbs .th button{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:13px;line-height:20px}
 .who{display:flex;align-items:center;gap:12px}
 .av{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#5B9BF8,#1E3A8A);color:#fff;display:grid;place-items:center;font-weight:600;flex:none}
 </style>
@@ -478,6 +482,44 @@ button.row:active{background:var(--card2)}
   <div class="list"><div class="field col"><textarea id="nota-env" placeholder="Por ejemplo: fotos del avance de la obra para el informe"></textarea></div></div>
   <div style="margin-top:22px"><button class="btn" id="e-env">Mandar a mi PC</button></div>
   <p class="foot" style="text-align:center;margin-top:12px"><svg width="13" height="13" style="vertical-align:-2px"><use href="#i-lock"/></svg> Viaja cifrado. Hasta 10 MB por envío.</p>
+</section>
+
+<!-- ======================= EMPEZAR EN EL CELULAR (cartas, TDR, valorización, conformidad) ======================= -->
+<section class="view" id="v-borr">
+  <div class="top"><button class="bk" data-atras><svg><use href="#i-back"/></svg>Inicio</button><div class="ttl" id="bo-ttl">Cartas</div><div class="rt"></div></div>
+  <h1 class="big" id="bo-t">Cartas con fotos</h1>
+  <p class="lead" id="bo-l"></p>
+  <div id="bo-cartas">
+    <div class="seg" id="bo-tipo" style="margin-bottom:10px"><button data-t="servicio" class="on">Orden de servicio</button><button data-t="compra">Orden de compra</button></div>
+    <div class="list">
+      <div class="field"><label for="bo-orden">N.° de orden</label><input id="bo-orden" inputmode="numeric" placeholder="Ej. 0245"></div>
+      <div class="field col"><label for="bo-serv">Descripción</label><input id="bo-serv" placeholder="Ej. SERVICIO DE ALQUILER DE MEZCLADORA" style="text-align:left" autocapitalize="characters"></div>
+      <div class="field col"><label for="bo-prov">Proveedor</label><input id="bo-prov" placeholder="Nombre o razón social" style="text-align:left" autocapitalize="characters"></div>
+      <div class="field"><label for="bo-ruc">RUC</label><input id="bo-ruc" inputmode="numeric" maxlength="11" placeholder="11 dígitos"></div>
+      <div class="field"><label for="bo-monto">Monto S/</label><input id="bo-monto" inputmode="decimal" placeholder="0.00"></div>
+      <div class="field col"><label for="bo-comp">Comprobante</label><input id="bo-comp" placeholder="Ej. FACTURA ELECTRÓNICA E001-93" style="text-align:left" autocapitalize="characters"></div>
+    </div>
+    <p class="foot">Lo que dejes vacío lo completas en la PC. Las fotos van al panel fotográfico.</p>
+  </div>
+  <div id="bo-valor" class="hide">
+    <div class="list"><div class="field"><label for="bo-nvalo">N.° de valorización</label><input id="bo-nvalo" inputmode="numeric" placeholder="Ej. 03"></div></div>
+  </div>
+  <div id="bo-tdr" class="hide">
+    <div class="list"><div class="field col"><label for="bo-asunto">Asunto del requerimiento</label><input id="bo-asunto" placeholder="Ej. SERVICIO DE ALQUILER DE VOLQUETE" style="text-align:left" autocapitalize="characters"></div></div>
+  </div>
+  <div class="sec" id="bo-sec-f">Fotos</div>
+  <input type="file" id="bo-cam" accept="image/*" capture="environment" class="hide">
+  <input type="file" id="bo-gal" multiple class="hide">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <button class="drop" id="bo-b-cam" style="padding:12px 8px"><svg><use href="#i-plus"/></svg><b>Tomar foto</b></button>
+    <button class="drop" id="bo-b-gal" style="padding:12px 8px"><svg><use href="#i-up"/></svg><b id="bo-gal-t">Galería o archivos</b></button>
+  </div>
+  <div class="thumbs" id="bo-th"></div>
+  <p class="foot" id="bo-tot"></p>
+  <div class="sec">Nota (opcional)</div>
+  <div class="list"><div class="field col"><textarea id="bo-nota" placeholder="Algo que quieras recordar en la PC"></textarea></div></div>
+  <div style="margin-top:16px"><button class="btn" id="bo-env">Mandar a mi PC</button></div>
+  <p class="foot" style="text-align:center;margin-top:10px">Tu PC abre el formulario ya lleno: solo revisas y generas.</p>
 </section>
 
 <!-- ======================= CHAT ======================= -->

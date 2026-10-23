@@ -5,7 +5,7 @@
      clave   = sha256("jasan-movil-k|"+t) → AES-256-GCM; blob = nonce12 | cifrado | tag16
      rutas   movil/<caja>/pedidos/<id>.bin · resultados/<id>.bin · pc.bin · anulado            */
 "use strict";
-const VERSION = "1.6 (JASAN 2.40.3)";
+const VERSION = "1.7 (JASAN 2.40.4)";
 const BUCKET = "jasan", TOPE_MB = 15, VIVO_SEG = 90;
 const $ = (q, el = document) => el.querySelector(q);
 const $$ = (q, el = document) => [...el.querySelectorAll(q)];
@@ -129,7 +129,7 @@ const UI = {
     $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + id));
     this.actual = id; window.scrollTo(0, 0);
     $("#tabs").classList.toggle("hide", !tab);
-    $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === id || (["cuadro", "req", "cotiz", "enviar", "chats", "chat", "ia", "avisos"].includes(id) && b.dataset.tab === "inicio")));
+    $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === id || (["cuadro", "req", "cotiz", "enviar", "chats", "chat", "ia", "avisos", "borr"].includes(id) && b.dataset.tab === "inicio")));
     if (id === "resultados") pintarResultados();
     if (id === "ajustes") pintarAjustes();
   },
@@ -154,11 +154,11 @@ const ACT = {
     ["enviar", "A mi PC", "Fotos o archivos del celular a tu computadora", "i-pc", "#0A84FF", true, "A mi PC"],
     ["cuadro", "Cuadro de requerimientos", "Analítico → cuadro, desagregado y PDF", "i-grid", "#2563EB", true, "Cuadro de req."],
     ["cotiz", "Cotizaciones", "Excel del cuadro → los 8 PDF de cada proceso", "i-quote", "#0EA5E9", true, "Cotizaciones"],
-    ["cartas", "Cartas con fotos", "Toma las fotos con la cámara", "i-mail", "#14B8A6", false, "Cartas"],
+    ["cartas", "Cartas con fotos", "Datos y fotos de la orden → el formulario de la PC ya lleno", "i-mail", "#14B8A6", true, "Cartas"],
     ["req", "Requerimientos", "Cuadro → una carta por pestaña", "i-list", "#6366F1", true, "Requerim."],
-    ["tdr", "TDR y EETT", "Términos de referencia y especificaciones", "i-book", "#8B5CF6", false, "TDR y EETT"],
-    ["valor", "Informe de valorización", "Con los avances que registras", "i-chart", "#F59E0B", false, "Valorización"],
-    ["conf", "Conformidad", "Los datos desde el celular, la firma en la PC", "i-check", "#22A653", false, "Conformidad"]
+    ["tdr", "TDR y EETT", "Empieza aquí y termina en la PC", "i-book", "#8B5CF6", true, "TDR y EETT"],
+    ["valor", "Informe de valorización", "Fotos del avance → la PC abre el informe", "i-chart", "#F59E0B", true, "Valorización"],
+    ["conf", "Conformidad", "Fotos o PDF de los documentos → Conformidad en la PC", "i-check", "#22A653", true, "Conformidad"]
   ],
   solo: [
     ["chat", "Chat", "Con tu equipo de JASAN", "i-chat", "#34C759", true, "Chat"],
@@ -192,6 +192,7 @@ function pintarActividades() {
   }
 }
 function abrirActividad(id) {
+  if (["cartas", "tdr", "valor", "conf"].includes(id)) return abrirBorrador(id);
   if (id === "chat") return abrirChat();
   if (id === "ia") { UI.ver("ia", { tab: false, empujar: true }); return pintarIA(); }
   if (id === "avisos") { UI.ver("avisos", { tab: false, empujar: true }); return pintarAvisos(); }
@@ -465,7 +466,7 @@ async function pintarResultados() {
     const el = document.createElement("div"); el.className = "res";
     const esperando = r.estado === "espera" || r.estado === "trabajando";
     const haciendo = { cuadro: "Revisando el analítico y armando el cuadro…", requerimientos: "Armando las cartas con tu macro…",
-      cotizaciones: "Armando los 8 PDF de cada proceso…", archivos: "Guardándolos en tu PC…" }[r.tipo] || "Tu PC lo está haciendo…";
+      cotizaciones: "Armando los 8 PDF de cada proceso…", archivos: "Guardándolos en tu PC…", borrador: "Abriendo el formulario en tu PC…" }[r.tipo] || "Tu PC lo está haciendo…";
     const sub = esperando ? (r.estado === "espera" ? (pcVivo ? "Tu PC lo recibe en segundos…" : "Esperando a que tu PC se conecte") : haciendo) : r.resumen;
     el.innerHTML = `<div class="hd"><b>${esc(r.estado === "listo" || r.estado === "observado" ? (r.tipo === "cuadro" ? "Cuadro · " : "") + r.titulo : r.titulo)}</b>
       <span class="st ${r.estado}">${esperando ? '<i class="spin mini"></i>' : ""}${ESTADO[r.estado] || r.estado}</span></div>
@@ -537,8 +538,63 @@ async function quitar(r) {
 }
 
 
+
+// ---------------------------------------------------------------- empezar en el celular, terminar en la PC
+const BORR = {
+  cartas: ["Cartas", "Cartas con fotos", "Pon lo que tengas de la orden y toma las fotos: tu PC abre el formulario de la orden ya lleno, con las fotos en el panel fotográfico.", "Fotos del panel fotográfico", "Galería"],
+  valor: ["Valorización", "Informe de valorización", "Toma las fotos del avance: tu PC abre el informe de valorización con tus fotos a la mano.", "Fotos del avance", "Galería"],
+  tdr: ["TDR y EETT", "TDR y EETT", "Escribe el asunto y adjunta lo que tengas (fotos, cotización, especificaciones): tu PC abre el módulo TDR.", "Archivos y fotos", "Archivos"],
+  conf: ["Conformidad", "Conformidad", "Toma fotos o adjunta los PDF de la carta del proveedor, la O/S, la notificación y el TDR: tu PC los pone en Conformidad y la revisa.", "Documentos (fotos o PDF)", "PDF o galería"]
+};
+let borrAct = "cartas"; const BF = [];
+function abrirBorrador(act) {
+  borrAct = act; const [ttl, t, l, sec, gal] = BORR[act];
+  $("#bo-ttl").textContent = ttl; $("#bo-t").textContent = t; $("#bo-l").textContent = l; $("#bo-sec-f").textContent = sec; $("#bo-gal-t").textContent = gal;
+  $("#bo-cartas").classList.toggle("hide", act !== "cartas"); $("#bo-valor").classList.toggle("hide", act !== "valor"); $("#bo-tdr").classList.toggle("hide", act !== "tdr");
+  $("#bo-gal").accept = act === "cartas" || act === "valor" ? "image/*" : "";
+  UI.ver("borr", { tab: false, empujar: true });
+}
+function prepararBorrador() {
+  $$("#bo-tipo button").forEach(b => b.onclick = () => $$("#bo-tipo button").forEach(x => x.classList.toggle("on", x === b)));
+  $("#bo-b-cam").onclick = () => $("#bo-cam").click(); $("#bo-b-gal").onclick = () => $("#bo-gal").click();
+  const add = async e => {
+    for (const f of [...e.target.files]) BF.push({ nombre: f.name || `FOTO ${isoLocal().slice(0, 19).replace(/[T:]/g, "-")}.jpg`, datos: new Uint8Array(await f.arrayBuffer()), tam: f.size, url: /^image\//.test(f.type) ? URL.createObjectURL(f) : "" });
+    e.target.value = ""; pintarBF();
+  };
+  $("#bo-cam").onchange = add; $("#bo-gal").onchange = add;
+  $("#bo-env").onclick = enviarBorrador;
+}
+function pintarBF() {
+  const c = $("#bo-th"); c.innerHTML = "";
+  BF.forEach((a, i) => { const d = document.createElement("div"); d.className = "th";
+    d.innerHTML = (a.url ? `<img src="${a.url}" alt="">` : esc(a.nombre.split(".").pop().toUpperCase())) + `<button aria-label="Quitar">×</button>`;
+    d.querySelector("button").onclick = () => { BF.splice(i, 1); pintarBF(); }; c.appendChild(d); });
+  const t = BF.reduce((s, a) => s + a.tam, 0);
+  $("#bo-tot").textContent = BF.length ? `${BF.length} archivo(s) · ${tam(t)}` + (t > TOPE_ENV ? " · pasa los 10 MB: quita alguno" : "") : "";
+  $("#bo-tot").style.color = t > TOPE_ENV ? "var(--red)" : "";
+}
+async function enviarBorrador() {
+  const act = borrAct, datos = { actividad: act, nota: $("#bo-nota").value.trim() };
+  if (act === "cartas") Object.assign(datos, { tipo: $("#bo-tipo .on").dataset.t, ORDEN: $("#bo-orden").value.trim(), SERVICIO: $("#bo-serv").value.trim(),
+    PROVEEDOR: $("#bo-prov").value.trim(), RUC: $("#bo-ruc").value.replace(/\D/g, ""), MONTO: $("#bo-monto").value.replace(",", ".").trim(), COMPROBANTE: $("#bo-comp").value.trim() });
+  if (act === "valor") datos.NVALO = $("#bo-nvalo").value.trim();
+  if (act === "tdr") datos.titulo = $("#bo-asunto").value.trim();
+  if (!BF.length && !(act === "cartas" && datos.ORDEN) && !(act === "tdr" && datos.titulo)) return UI.toast(act === "conf" ? "Toma fotos o adjunta los documentos" : "Agrega al menos una foto o un dato");
+  if (BF.reduce((s, a) => s + a.tam, 0) > TOPE_ENV) return UI.toast("Pasa los 10 MB: quita alguna foto");
+  const btn = $("#bo-env"); btn.disabled = true; btn.innerHTML = `<i class="spin"></i>Enviando…`;
+  try {
+    const id = nuevoId(), creado = isoLocal();
+    await Nube.put(ruta(`pedidos/${id}.bin`), await cifrar({ tipo: "borrador", creado, datos, archivos: BF.map(a => ({ nombre: a.nombre, b64: b64Enc(a.datos) })) }));
+    await DB.poner({ id, estado: "espera", titulo: BORR[act][1], resumen: `${BF.length} archivo(s)` + (datos.ORDEN ? ` · orden ${datos.ORDEN}` : ""), tipo: "borrador", pedido: creado, archivos: [] });
+    BF.length = 0; pintarBF(); ["#bo-orden", "#bo-serv", "#bo-prov", "#bo-ruc", "#bo-monto", "#bo-comp", "#bo-nvalo", "#bo-asunto", "#bo-nota"].forEach(q => $(q).value = "");
+    UI.ver("resultados"); verPanel("cel");
+    UI.toast(pcVivo ? "Enviado. Tu PC abre el formulario ahora" : "Enviado. Tu PC lo abrirá al conectarse", 3200); vigilar(true);
+  } catch { UI.hoja({ icono: "i-up", color: "#E5484D", titulo: "No se pudo enviar", texto: navigator.onLine ? "La nube no respondió. Vuelve a intentarlo." : "No tienes internet." }); }
+  finally { btn.disabled = false; btn.textContent = "Mandar a mi PC"; }
+}
+
 // ---------------------------------------------------------------- inicio: «Lo último»
-const NOMBRE_TIPO = { cuadro: "Cuadro de requerimientos", requerimientos: "Requerimientos", cotizaciones: "Cotizaciones", archivos: "A mi PC" };
+const NOMBRE_TIPO = { cuadro: "Cuadro de requerimientos", requerimientos: "Requerimientos", cotizaciones: "Cotizaciones", archivos: "A mi PC", borrador: "Empezado en el celular" };
 async function pintarHero() {
   const h = $("#hero"); if (!h) return;
   const l = (await DB.todos()).filter(x => x.tipo !== "ia").sort((a, b) => String(b.pedido || "").localeCompare(String(a.pedido || "")));
@@ -882,7 +938,7 @@ $("#b-pegar").onclick = async () => {
 
 let recargando = false;
 async function iniciar() {
-  pintarActividades(); prepararCuadro(); prepararReq(); prepararCotiz(); prepararEnviar();
+  pintarActividades(); prepararCuadro(); prepararReq(); prepararCotiz(); prepararEnviar(); prepararBorrador();
   $("#chat-send").onclick = enviarChat; $("#ia-send").onclick = enviarIA;
   for (const [t, f] of [["#chat-in", enviarChat], ["#ia-in", enviarIA]]) {
     $(t).addEventListener("input", e => crecer(e.target));
