@@ -5,7 +5,7 @@
      clave   = sha256("jasan-movil-k|"+t) → AES-256-GCM; blob = nonce12 | cifrado | tag16
      rutas   movil/<caja>/pedidos/<id>.bin · resultados/<id>.bin · pc.bin · anulado            */
 "use strict";
-const VERSION = "1.1 (JASAN 2.39.1)";
+const VERSION = "1.2 (JASAN 2.39.1)";
 const BUCKET = "jasan", TOPE_MB = 15, VIVO_SEG = 90;
 const $ = (q, el = document) => el.querySelector(q);
 const $$ = (q, el = document) => [...el.querySelectorAll(q)];
@@ -151,36 +151,37 @@ addEventListener("scroll", () => $$(".view.on .top").forEach(t => t.classList.to
 // ---------------------------------------------------------------- actividades (lo que se puede desde el celular)
 const ACT = {
   cel: [
-    ["cuadro", "Cuadro de requerimientos", "Analítico → cuadro, desagregado y PDF", "i-grid", "#2563EB", true],
-    ["cotiz", "Cotizaciones", "Llenas los datos, tu PC arma el cuadro comparativo", "i-quote", "#0EA5E9"],
-    ["cartas", "Cartas con fotos", "Toma las fotos con la cámara", "i-mail", "#14B8A6"],
-    ["req", "Requerimientos", "Bienes y servicios", "i-list", "#6366F1"],
-    ["tdr", "TDR y EETT", "Términos de referencia y especificaciones", "i-book", "#8B5CF6"],
-    ["valor", "Informe de valorización", "Con los avances que registras", "i-chart", "#F59E0B"],
-    ["conf", "Conformidad", "Los datos desde el celular, la firma en la PC", "i-check", "#22A653"]
+    ["cuadro", "Cuadro de requerimientos", "Analítico → cuadro, desagregado y PDF", "i-grid", "#2563EB", true, "Cuadro de req."],
+    ["cotiz", "Cotizaciones", "Llenas los datos, tu PC arma el cuadro comparativo", "i-quote", "#0EA5E9", false, "Cotizaciones"],
+    ["cartas", "Cartas con fotos", "Toma las fotos con la cámara", "i-mail", "#14B8A6", false, "Cartas"],
+    ["req", "Requerimientos", "Bienes y servicios", "i-list", "#6366F1", false, "Requerim."],
+    ["tdr", "TDR y EETT", "Términos de referencia y especificaciones", "i-book", "#8B5CF6", false, "TDR y EETT"],
+    ["valor", "Informe de valorización", "Con los avances que registras", "i-chart", "#F59E0B", false, "Valorización"],
+    ["conf", "Conformidad", "Los datos desde el celular, la firma en la PC", "i-check", "#22A653", false, "Conformidad"]
   ],
   solo: [
-    ["chat", "Chat", "Con tu equipo de JASAN", "i-chat", "#34C759"],
-    ["ia", "Consultar a la IA", "Criterios, normas, precios", "i-spark", "#AF52DE"],
-    ["avisos", "Avisos", "Lo que publica tu administrador", "i-bell", "#FF9500"]
+    ["chat", "Chat", "Con tu equipo de JASAN", "i-chat", "#34C759", false, "Chat"],
+    ["ia", "Consultar a la IA", "Criterios, normas, precios", "i-spark", "#AF52DE", false, "Consultar IA"],
+    ["avisos", "Avisos", "Lo que publica tu administrador", "i-bell", "#FF9500", false, "Avisos"]
   ],
   pc: [
-    ["pdf", "Editor de PDF", "", "i-pdf", "#E5484D"],
-    ["cuadrar", "Cuadrar al monto", "", "i-scale", "#2563EB"],
-    ["word", "Llenar el Word abierto", "", "i-word", "#2B579A"],
-    ["firmar", "Firmar en lote", "", "i-pen", "#111827"],
-    ["macros", "Mis macros y ajustes", "", "i-gear", "#8E8E93"]
+    ["pdf", "Editor de PDF", "", "i-pdf", "#E5484D", false, "PDF"],
+    ["cuadrar", "Cuadrar al monto", "", "i-scale", "#2563EB", false, "Cuadrar"],
+    ["word", "Llenar el Word abierto", "", "i-word", "#2B579A", false, "Llenar Word"],
+    ["firmar", "Firmar en lote", "", "i-pen", "#111827", false, "Firmar lote"],
+    ["macros", "Mis macros y ajustes", "", "i-gear", "#8E8E93", false, "Macros"]
   ]
 };
-function fila([id, t, s, ic, col, activo], modo) {
-  const b = document.createElement("button"); b.className = "row" + (activo ? "" : " dim");
-  const der = activo ? `<svg class="chev"><use href="#i-chev"/></svg>` : `<span class="tag${modo === "pc" ? "" : " b"}">${modo === "pc" ? "En la PC" : "Próximamente"}</span>`;
-  b.innerHTML = `<span class="ic" style="background:${col}"><svg><use href="#${ic}"/></svg></span><span class="tx"><b>${esc(t)}</b>${s ? `<span>${esc(s)}</span>` : ""}</span>${der}`;
+function fila([id, t, s, ic, col, activo, corto], modo) {
+  const b = document.createElement("button"); b.className = "app" + (activo ? "" : " dim");
+  const pill = activo ? "" : `<span class="pill${modo === "pc" ? "" : " b"}">${modo === "pc" ? "PC" : "Pronto"}</span>`;
+  b.innerHTML = `<span class="ai" style="background:${col}"><svg><use href="#${ic}"/></svg></span>${pill}<b>${esc(corto || t)}</b>`;
+  b.setAttribute("aria-label", t);
   b.onclick = () => {
     if (activo) return abrirActividad(id);
-    if (modo === "pc") return UI.hoja({ icono: "i-pc", color: col, titulo: "Ábrelo en la computadora",
+    if (modo === "pc") return UI.hoja({ icono: ic, color: col, titulo: "Ábrelo en la computadora",
       texto: `«${t}» necesita la pantalla grande. Ábrelo en JASAN de tu computadora.` });
-    UI.hoja({ icono: ic, color: col, titulo: t, texto: "Muy pronto también desde el celular. Por ahora, hazlo en JASAN de tu computadora." });
+    UI.hoja({ icono: ic, color: col, titulo: t, texto: (s ? s + ". " : "") + "Muy pronto también desde el celular; por ahora, hazlo en JASAN de tu computadora." });
   };
   return b;
 }
