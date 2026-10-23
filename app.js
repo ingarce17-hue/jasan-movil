@@ -5,7 +5,7 @@
      clave   = sha256("jasan-movil-k|"+t) → AES-256-GCM; blob = nonce12 | cifrado | tag16
      rutas   movil/<caja>/pedidos/<id>.bin · resultados/<id>.bin · pc.bin · anulado            */
 "use strict";
-const VERSION = "1.4 (JASAN 2.40.1)";
+const VERSION = "1.5 (JASAN 2.40.2)";
 const BUCKET = "jasan", TOPE_MB = 15, VIVO_SEG = 90;
 const $ = (q, el = document) => el.querySelector(q);
 const $$ = (q, el = document) => [...el.querySelectorAll(q)];
@@ -240,7 +240,7 @@ function prepararCuadro() {
   $("#b-xls").onclick = elegir; $("#b-xls2").onclick = elegir;
   $("#f-xls").onchange = e => {
     const f = e.target.files[0]; e.target.value = ""; if (!f) return;
-    if (!/\.(xlsx|xlsm)$/i.test(f.name)) return UI.hoja({ icono: "i-grid", color: "#E5484D", titulo: "Ese no es un Excel", texto: "Elige el analítico o el desagregado en formato .xlsx." });
+    if (!/\.(xlsx|xlsm|xls)$/i.test(f.name)) return UI.hoja({ icono: "i-grid", color: "#E5484D", titulo: "Ese no es un Excel", texto: "Elige el analítico o el desagregado (Excel .xlsx o .xls)." });
     if (f.size > TOPE_MB * 1048576) return UI.hoja({ icono: "i-grid", color: "#E5484D", titulo: "Archivo muy pesado", texto: `El Excel pasa los ${TOPE_MB} MB.` });
     xls = f; $("#xls-n").textContent = f.name; $("#xls-t").textContent = tam(f.size) + " · listo para enviar";
     $("#b-xls").classList.add("hide"); $("#xls-ok").classList.remove("hide");
@@ -279,7 +279,7 @@ function selector(p, aviso) {
   $(`#b-${p}`).onclick = elegir; $(`#c-${p}`).onclick = elegir;
   $(`#f-${p}`).onchange = async e => {
     const f = e.target.files[0]; e.target.value = ""; if (!f) return;
-    if (!/\.(xlsx|xlsm)$/i.test(f.name)) return UI.hoja({ icono: "i-grid", color: "#E5484D", titulo: "Ese no es un Excel", texto: aviso });
+    if (!/\.(xlsx|xlsm|xls)$/i.test(f.name)) return UI.hoja({ icono: "i-grid", color: "#E5484D", titulo: "Ese no es un Excel", texto: aviso });
     if (f.size > TOPE_MB * 1048576) return UI.hoja({ icono: "i-grid", color: "#E5484D", titulo: "Archivo muy pesado", texto: `El Excel pasa los ${TOPE_MB} MB.` });
     ponerArchivo(p, { nombre: f.name, datos: new Uint8Array(await f.arrayBuffer()), tam: f.size });
   };
