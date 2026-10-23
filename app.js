@@ -5,7 +5,7 @@
      clave   = sha256("jasan-movil-k|"+t) → AES-256-GCM; blob = nonce12 | cifrado | tag16
      rutas   movil/<caja>/pedidos/<id>.bin · resultados/<id>.bin · pc.bin · anulado            */
 "use strict";
-const VERSION = "1.0 (JASAN 2.39.0)";
+const VERSION = "1.1 (JASAN 2.39.1)";
 const BUCKET = "jasan", TOPE_MB = 15, VIVO_SEG = 90;
 const $ = (q, el = document) => el.querySelector(q);
 const $$ = (q, el = document) => [...el.querySelectorAll(q)];
@@ -65,11 +65,11 @@ async function cifrar(obj) {
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, KEY, enc.encode(JSON.stringify(obj))));
   const out = new Uint8Array(12 + ct.length); out.set(iv); out.set(ct, 12); return out;
 }
-async function descifrar(buf) {
+async function descifrarBytes(buf) {
   const u = new Uint8Array(buf); if (u.length < 28) throw new Error("incompleto");
-  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: u.subarray(0, 12) }, KEY, u.subarray(12));
-  return JSON.parse(dec.decode(pt));
+  return new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: u.subarray(0, 12) }, KEY, u.subarray(12)));
 }
+async function descifrar(buf) { return JSON.parse(dec.decode(await descifrarBytes(buf))); }
 
 // ---------------------------------------------------------------- nube (Supabase Storage con la clave pública)
 const Nube = {
@@ -104,14 +104,21 @@ const ruta = (sub = "") => `movil/${CAJA}` + (sub ? "/" + sub : "");
 // ---------------------------------------------------------------- resultados guardados en el celular (IndexedDB)
 const DB = {
   db: null,
-  abrir() { return this.db || (this.db = new Promise((ok, mal) => { const r = indexedDB.open("jasan-movil", 1);
-    r.onupgradeneeded = () => r.result.createObjectStore("res", { keyPath: "id" }); r.onsuccess = () => ok(r.result); r.onerror = () => mal(r.error); })); },
-  async tx(modo, fn) { const db = await this.abrir(); return new Promise((ok, mal) => { const t = db.transaction("res", modo), s = t.objectStore("res");
+  abrir() { return this.db || (this.db = new Promise((ok, mal) => { const r = indexedDB.open("jasan-movil", 2);
+    r.onupgradeneeded = () => { const db = r.result;
+      if (!db.objectStoreNames.contains("res")) db.createObjectStore("res", { keyPath: "id" });
+      if (!db.objectStoreNames.contains("arch")) db.createObjectStore("arch", { keyPath: "id" }); };
+    r.onsuccess = () => ok(r.result); r.onerror = () => mal(r.error); })); },
+  async tx(modo, fn, tienda = "res") { const db = await this.abrir(); return new Promise((ok, mal) => { const t = db.transaction(tienda, modo), s = t.objectStore(tienda);
     const r = fn(s); t.oncomplete = () => ok(r && r.result); t.onerror = () => mal(t.error); }); },
   todos() { return this.tx("readonly", s => s.getAll()).then(x => x || []).catch(() => []); },
   poner(o) { return this.tx("readwrite", s => s.put(o)).catch(() => {}); },
   quitar(id) { return this.tx("readwrite", s => s.delete(id)).catch(() => {}); },
-  vaciar() { return this.tx("readwrite", s => s.clear()).catch(() => {}); }
+  vaciar() { return Promise.all([this.tx("readwrite", s => s.clear()), this.tx("readwrite", s => s.clear(), "arch")]).catch(() => {}); },
+  arch(id) { return this.tx("readonly", s => s.get(id), "arch").catch(() => null); },
+  guardarArch(o) { return this.tx("readwrite", s => s.put(o), "arch").catch(() => {}); },
+  archivos() { return this.tx("readonly", s => s.getAll(), "arch").then(x => x || []).catch(() => []); },
+  quitarArch(id) { return this.tx("readwrite", s => s.delete(id), "arch").catch(() => {}); }
 };
 
 // ---------------------------------------------------------------- pantalla
@@ -285,6 +292,7 @@ function vigilar(rapido) {
   const paso = async () => {
     const n = await traerResultados();
     if (n) { UI.toast(n === 1 ? "Llegó un resultado" : `Llegaron ${n} resultados`); try { navigator.vibrate && navigator.vibrate(30); } catch {} }
+    if (!document.hidden) await traerSalidas();
     await pintarBadge(); if (UI.actual === "resultados") pintarResultados();
     const pend = (await DB.todos()).some(x => x.estado === "espera" || x.estado === "trabajando");
     vigilando = setTimeout(paso, pend ? 6000 : 30000);
@@ -292,12 +300,14 @@ function vigilar(rapido) {
   vigilando = setTimeout(paso, rapido ? 2500 : 0);
 }
 async function pintarBadge() {
-  const n = (await DB.todos()).filter(x => x.nuevo).length;
+  const n = (await DB.todos()).filter(x => x.nuevo).length + salNuevas();
   $("#badge").textContent = n; $("#badge").classList.toggle("hide", !n);
 }
 const ESTADO = { listo: "Listo", observado: "Observado", error: "No se hizo", espera: "Enviado", trabajando: "Tu PC lo hace" };
 function clase(nombre) { const e = nombre.split(".").pop().toLowerCase();
-  return e === "pdf" ? ["pdf", "PDF"] : e === "docx" ? ["doc", "DOCX"] : e === "txt" ? ["txt", "TXT"] : ["", "XLSX"]; }
+  if (e === "pdf") return ["pdf", "PDF"]; if (e === "docx" || e === "doc") return ["doc", e.toUpperCase()];
+  if (["txt", "csv", "zip", "jpg", "jpeg", "png", "pptx"].includes(e)) return ["txt", e.toUpperCase().slice(0, 4)];
+  return ["", e.toUpperCase().slice(0, 4)]; }
 async function pintarResultados() {
   const lista = (await DB.todos()).sort((a, b) => String(b.pedido || "").localeCompare(String(a.pedido || "")));
   const cont = $("#l-res"); cont.innerHTML = "";
@@ -318,32 +328,134 @@ async function pintarResultados() {
       const [c, t] = clase(a.nombre); const f = document.createElement("div"); f.className = "file"; f.style.boxShadow = "none"; f.style.background = "var(--card2)";
       f.innerHTML = `<i class="xl ${c}">${t}</i><div class="tx"><b>${esc(a.nombre)}</b><span>${tam(a.tam || a.b64.length * .75)}</span></div>
         <button class="link" aria-label="Guardar"><svg width="22" height="22"><use href="#${navigator.canShare ? "i-share" : "i-down"}"/></svg></button>`;
-      f.onclick = () => bajar(r, i);
+      f.onclick = () => acciones([archivoDe(a)]);
       fl.appendChild(f);
     });
+    const pie = document.createElement("div"); pie.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-top:6px";
     if (!esperando || r.estado === "espera") {
-      const q = document.createElement("button"); q.className = "link"; q.style.cssText = "color:var(--sub);font-size:13px;margin-top:6px";
-      q.textContent = r.estado === "espera" ? "Cancelar envío" : "Quitar"; q.onclick = () => quitar(r); el.appendChild(q);
+      const q = document.createElement("button"); q.className = "link"; q.style.cssText = "color:var(--sub);font-size:13px";
+      q.textContent = r.estado === "espera" ? "Cancelar envío" : "Quitar"; q.onclick = () => quitar(r); pie.appendChild(q);
     }
+    if ((r.archivos || []).length > 1) {
+      const c = document.createElement("button"); c.className = "link compartir-todo"; c.style.cssText = "display:flex;align-items:center;gap:5px;font-size:14px";
+      c.innerHTML = `<svg width="17" height="17"><use href="#i-share"/></svg>Compartir todos (${r.archivos.length})`;
+      c.onclick = () => acciones(r.archivos.map(archivoDe)); pie.appendChild(c);
+    }
+    el.appendChild(pie);
     cont.appendChild(el);
   }
   if (lista.some(x => x.nuevo)) { for (const x of lista) if (x.nuevo) { x.nuevo = false; await DB.poner(x); } setTimeout(pintarBadge, 400); }
 }
 const MIME = { xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", pdf: "application/pdf",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", txt: "text/plain" };
-async function bajar(r, i) {
-  const a = r.archivos[i], ext = a.nombre.split(".").pop().toLowerCase();
-  const file = new File([b64Dec(a.b64)], a.nombre, { type: MIME[ext] || "application/octet-stream" });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: a.nombre }); return; } catch (e) { if (e.name === "AbortError") return; }
-  }
-  const url = URL.createObjectURL(file), el = document.createElement("a");
-  el.href = url; el.download = a.nombre; document.body.appendChild(el); el.click(); el.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", txt: "text/plain",
+  xlsm: "application/vnd.ms-excel.sheet.macroEnabled.12", xls: "application/vnd.ms-excel", doc: "application/msword", csv: "text/csv",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", zip: "application/zip", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png" };
+const hacerArchivo = (datos, nombre) => new File([datos], nombre, { type: MIME[nombre.split(".").pop().toLowerCase()] || "application/octet-stream" });
+const archivoDe = a => hacerArchivo(b64Dec(a.b64), a.nombre);
+const puedeCompartir = files => { try { return !!(navigator.canShare && navigator.canShare({ files })); } catch { return false; } };
+/* Hoja con «Compartir» (WhatsApp, correo, Drive… del propio celular) y «Guardar en el celular».
+   Los archivos ya están listos en el celular: el toque en el botón abre el menú de compartir al instante. */
+function acciones(files) {
+  const uno = files.length === 1, comp = puedeCompartir(files);
+  UI.hoja({ icono: "i-share", color: "#25A244", titulo: uno ? files[0].name : `${files.length} archivos`,
+    texto: comp ? "Envíalo por WhatsApp, correo o Drive, o guárdalo en el celular." : "Guárdalo en el celular para enviarlo luego.",
+    botones: [...(comp ? [{ t: uno ? "Compartir" : `Compartir los ${files.length}`, fn: () => compartir(files) }] : []),
+      { t: uno ? "Guardar en el celular" : "Guardar todos en el celular", clase: comp ? "gray" : "", fn: () => guardar(files) },
+      { t: "Cancelar", clase: "gray" }] });
+}
+async function compartir(files) {
+  try { await navigator.share({ files, title: files.length === 1 ? files[0].name : "JASAN" }); }
+  catch (e) { if (e.name !== "AbortError") { UI.toast("No se pudo compartir; se guardan en el celular"); guardar(files); } }
+}
+function guardar(files) {
+  files.forEach((file, i) => setTimeout(() => {
+    const url = URL.createObjectURL(file), el = document.createElement("a");
+    el.href = url; el.download = file.name; document.body.appendChild(el); el.click(); el.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  }, i * 400));
 }
 async function quitar(r) {
   if (r.estado === "espera") { try { await Nube.remove([ruta(`pedidos/${r.id}.bin`)]); } catch {} }
   await DB.quitar(r.id); pintarResultados(); pintarBadge();
+}
+
+// ---------------------------------------------------------------- salidas de la PC (7 días en la nube)
+let SAL = [], salTraido = false, panelRes = "cel";
+const leerLS = (k, d = "") => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
+const ponerLS = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+function salNuevas() { const v = leerLS("jasan.salvisto"); return SAL.filter(x => (x.subido || "") > v).length; }
+async function traerSalidas() {
+  if (!vin) return;
+  try { const b = await Nube.get(ruta("salidas.bin")); SAL = b ? ((await descifrar(b)).archivos || []) : []; salTraido = true; } catch {}
+  const vivos = new Set(SAL.map(x => x.id));                 // lo que la PC ya borró, también sale del celular
+  for (const a of await DB.archivos()) if (!vivos.has(a.id) && salTraido) await DB.quitarArch(a.id);
+  $("#dot-pc").classList.toggle("hide", !salNuevas());
+}
+$$("#seg-res button").forEach(b => b.onclick = () => verPanel(b.dataset.s));
+function verPanel(p) {
+  panelRes = p;
+  $$("#seg-res button").forEach(b => b.classList.toggle("on", b.dataset.s === p));
+  $("#p-cel").classList.toggle("hide", p !== "cel"); $("#p-pc").classList.toggle("hide", p !== "pc");
+  if (p === "pc") { pintarSalidas(); traerSalidas().then(pintarSalidas); }
+}
+async function pintarSalidas() {
+  const cont = $("#l-sal"), guard = new Set((await DB.archivos()).map(a => a.id));
+  if (!SAL.length) {
+    cont.innerHTML = `<div class="empty"><svg><use href="#i-pc"/></svg><b>${salTraido ? "Nada en los últimos 7 días" : "Cargando…"}</b>${salTraido ? "Lo que generes en JASAN de tu computadora aparecerá aquí." : ""}</div>`;
+    return;
+  }
+  const lista = [...SAL].sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  const visto = leerLS("jasan.salvisto");
+  cont.innerHTML = "";
+  let dia = "", grupo = null;
+  for (const a of lista) {
+    const d = new Date(a.fecha), k = d.toDateString();
+    if (k !== dia) {
+      dia = k; const hoy = new Date().toDateString(), ayer = new Date(Date.now() - 864e5).toDateString();
+      const t = document.createElement("div"); t.className = "dia";
+      t.textContent = k === hoy ? "Hoy" : k === ayer ? "Ayer" : d.toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" });
+      const del = lista.filter(x => new Date(x.fecha).toDateString() === k);
+      t.style.cssText = "display:flex;justify-content:space-between;align-items:center";
+      t.innerHTML = `<span>${t.textContent}</span>` + (del.length > 1 ? `<button class="link compartir-todo" style="text-transform:none;font-size:13.5px;display:flex;align-items:center;gap:4px"><svg width="15" height="15"><use href="#i-share"/></svg>Compartir todos (${del.length})</button>` : "");
+      const bt = t.querySelector("button"); if (bt) bt.onclick = () => salidasLote(del, bt);
+      cont.appendChild(t); grupo = document.createElement("div"); grupo.className = "list"; cont.appendChild(grupo);
+    }
+    const [c, t] = clase(a.nombre), b = document.createElement("button"); b.className = "sal";
+    const nuevo = (a.subido || "") > visto;
+    b.innerHTML = `<i class="xl ${c}" style="width:36px;height:44px;border-radius:7px;font-size:10.5px;font-weight:700;color:#fff;display:grid;place-items:center;flex:none;font-style:normal;background:${{ pdf: "#D93025", doc: "#2B579A", txt: "#6E6E73" }[c] || "#1D7044"}">${t}</i>
+      <span class="tx"><b>${esc(a.nombre)}</b><span>${nuevo ? '<b style="display:inline;color:var(--blue);font-size:12.5px">Nuevo · </b>' : ""}${esc(a.carpeta || "SALIDAS")} · ${tam(a.tam)} · ${d.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}</span></span>
+      <svg width="22" height="22" class="${guard.has(a.id) ? "ok" : ""}" style="flex:none;color:${guard.has(a.id) ? "var(--green)" : "var(--blue)"}"><use href="#${guard.has(a.id) ? "i-check" : "i-down"}"/></svg>`;
+    b.onclick = () => bajarSalida(a, b);
+    grupo.appendChild(b);
+  }
+  const ult = lista.reduce((m, x) => (x.subido || "") > m ? x.subido : m, "");
+  if (ult > visto) { ponerLS("jasan.salvisto", ult); setTimeout(() => { $("#dot-pc").classList.add("hide"); pintarBadge(); }, 600); }
+}
+async function datosSalida(a) {
+  const o = await DB.arch(a.id); if (o && o.datos) return o.datos;
+  const b = await Nube.get(ruta(`salidas/${a.id}.bin`));
+  if (!b) return null;
+  const datos = await descifrarBytes(b);
+  if (datos.length < 8 * 1048576) await DB.guardarArch({ id: a.id, datos, nombre: a.nombre, subido: a.subido });
+  return datos;
+}
+const ruedita = '<i class="spin mini" style="flex:none;border-color:rgba(37,99,235,.25);border-top-color:var(--blue);width:20px;height:20px"></i>';
+async function bajarSalida(a, fila) {
+  const ic = fila.querySelector("svg:last-child"); if (ic) ic.outerHTML = ruedita;
+  try {
+    const datos = await datosSalida(a);
+    if (!datos) { UI.toast("Ese archivo ya no está en la nube"); return traerSalidas().then(pintarSalidas); }
+    await pintarSalidas(); acciones([hacerArchivo(datos, a.nombre)]);
+  } catch { UI.toast(navigator.onLine ? "No se pudo bajar. Intenta otra vez" : "Sin internet"); pintarSalidas(); }
+}
+async function salidasLote(lista, bt) {
+  bt.innerHTML = ruedita + "Preparando…";
+  try {
+    const files = [];
+    for (const a of lista) { const d = await datosSalida(a); if (d) files.push(hacerArchivo(d, a.nombre)); }
+    await pintarSalidas();
+    if (files.length) acciones(files); else UI.toast("Ya no están en la nube");
+  } catch { UI.toast(navigator.onLine ? "No se pudo bajar. Intenta otra vez" : "Sin internet"); pintarSalidas(); }
 }
 
 // ---------------------------------------------------------------- ajustes
@@ -367,6 +479,21 @@ async function desvinculado() {
   UI.ver("vincular", { tab: false });
   UI.hoja({ icono: "i-lock", color: "#E5484D", titulo: "Este celular fue desvinculado", texto: "Se quitó desde JASAN en la computadora. Escanea otra vez tu QR para vincularlo." });
 }
+
+// ---------------------------------------------------------------- día / noche
+const Tema = {
+  modo() { try { return localStorage.getItem("jasan.tema") || "auto"; } catch { return "auto"; } },
+  aplicar(m = this.modo()) {
+    const oscuro = m === "dark" || (m === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.setAttribute("data-theme", oscuro ? "dark" : "light");
+    const mc = $("#m-color"); if (mc) mc.setAttribute("content", oscuro ? "#000000" : "#F2F2F7");
+    $$("#tema button").forEach(b => b.classList.toggle("on", b.dataset.t === m));
+  },
+  poner(m) { try { localStorage.setItem("jasan.tema", m); } catch {} this.aplicar(m); }
+};
+$$("#tema button").forEach(b => b.onclick = () => Tema.poner(b.dataset.t));
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => Tema.aplicar());
+Tema.aplicar();
 
 // ---------------------------------------------------------------- instalar
 let promptInstalar = null;
@@ -402,6 +529,7 @@ $("#b-pegar").onclick = async () => {
   V.guardar(v); await preparar(v); entrar();
 };
 
+let recargando = false;
 async function iniciar() {
   pintarActividades(); prepararCuadro();
   const t0 = Date.now();
@@ -409,7 +537,17 @@ async function iniciar() {
   let v = V.leer();
   if (delEnlace && (!v || v.t !== delEnlace.t)) { v = delEnlace; V.guardar(v); }
   if (v) await preparar(v);
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  if ("serviceWorker" in navigator) {
+    const habia = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register("sw.js").then(reg => {
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) reg.update().catch(() => {}); });
+    }).catch(() => {});
+    navigator.serviceWorker.addEventListener("controllerchange", () => {      // llegó una versión nueva: se recarga sola
+      if (!habia || recargando) return; recargando = true;
+      try { sessionStorage.setItem("jasan.actualizado", "1"); } catch {}
+      location.reload();
+    });
+  }
   const espera = Math.max(0, 1900 - (Date.now() - t0));
   setTimeout(() => {
     $("#splash").classList.add("out");
@@ -417,6 +555,8 @@ async function iniciar() {
     if (!v) UI.ver("vincular", { tab: false });
     else if (delEnlace && !standalone() && !seguir) pantallaInstalar();
     else entrar();
+    let act = false; try { act = sessionStorage.getItem("jasan.actualizado") === "1"; sessionStorage.removeItem("jasan.actualizado"); } catch {}
+    if (act) setTimeout(() => UI.toast(`JASAN Móvil se actualizó · ${VERSION.split(" ")[0]}`, 3200), 600);
   }, espera);
 }
 if (!window.crypto || !crypto.subtle) {

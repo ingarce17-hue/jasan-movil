@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>JASAN Móvil</title>
 <meta name="description" content="JASAN en tu celular: envías el pedido y tu computadora con JASAN lo hace.">
-<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F2F2F7" id="m-color">
+<script>/* Día / Noche / Automático: se aplica antes de pintar (sin parpadeo) */
+(function(){var m="auto";try{m=localStorage.getItem("jasan.tema")||"auto"}catch(e){}
+var d=m==="dark"||(m==="auto"&&matchMedia("(prefers-color-scheme: dark)").matches);
+document.documentElement.setAttribute("data-theme",d?"dark":"light");
+document.getElementById("m-color").setAttribute("content",d?"#000000":"#F2F2F7");})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="JASAN">
@@ -25,11 +29,11 @@
   --r:16px; --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   --safeT:env(safe-area-inset-top,0px); --safeB:env(safe-area-inset-bottom,0px);
 }
-@media (prefers-color-scheme: dark){
-  :root{--bg:#000; --card:#1C1C1E; --card2:#2C2C2E; --text:#F5F5F7; --sub:#98989F; --sep:rgba(84,84,88,.45);
+:root{color-scheme:light}
+:root[data-theme=dark]{color-scheme:dark;
+  --bg:#000; --card:#1C1C1E; --card2:#2C2C2E; --text:#F5F5F7; --sub:#98989F; --sep:rgba(84,84,88,.45);
     --blue:#4C8DFF; --blueSoft:rgba(76,141,255,.16); --bar:rgba(18,18,20,.78); --shadow:none;
     --greenSoft:rgba(48,209,88,.16); --green:#30D158; --orangeSoft:rgba(255,159,10,.16); --redSoft:rgba(255,69,58,.16)}
-}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased;
   font-size:17px;line-height:1.35;overscroll-behavior-y:none}
@@ -40,7 +44,7 @@ button{cursor:pointer;border:0;background:none;padding:0}
 /* ------------------------------------------------ splash */
 #splash{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:radial-gradient(120% 80% at 50% 40%,#FFFFFF 0%,#EEF3FF 55%,#E3EBFF 100%);transition:opacity .55s ease,visibility .55s}
-@media (prefers-color-scheme: dark){#splash{background:radial-gradient(120% 80% at 50% 40%,#101a33 0%,#070b16 60%,#000 100%)}}
+[data-theme=dark] #splash{background:radial-gradient(120% 80% at 50% 40%,#101a33 0%,#070b16 60%,#000 100%)}
 #splash.out{opacity:0;visibility:hidden}
 .mk{width:118px;height:118px;filter:drop-shadow(0 18px 30px rgba(37,99,235,.35))}
 .mk .side,.mk .base{transform-origin:58% 42%;animation:extrude .7s cubic-bezier(.2,.8,.2,1) .15s both}
@@ -123,7 +127,7 @@ button.row:active{background:var(--card2)}
 .sw{position:relative;width:51px;height:31px;flex:none}
 .sw input{opacity:0;position:absolute;inset:0;margin:0;z-index:1}
 .sw i{position:absolute;inset:0;border-radius:99px;background:#E9E9EA;transition:background .25s}
-@media (prefers-color-scheme: dark){.sw i{background:#39393D}}
+[data-theme=dark] .sw i{background:#39393D}
 .sw i::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;
   box-shadow:0 3px 8px rgba(0,0,0,.15),0 1px 1px rgba(0,0,0,.16);transition:transform .25s cubic-bezier(.3,1.3,.5,1)}
 .sw input:checked+i{background:#34C759}.sw input:checked+i::after{transform:translateX(20px)}
@@ -200,6 +204,18 @@ button.row:active{background:var(--card2)}
 .steps .row .n{counter-increment:s;width:28px;height:28px;border-radius:50%;background:var(--blueSoft);color:var(--blue);font-weight:700;font-size:14px;display:grid;place-items:center;flex:none;font-style:normal}
 .steps .row .n::before{content:counter(s)}
 .ios-share{display:inline-block;vertical-align:-3px;width:17px;height:17px;color:var(--blue)}
+.seg{display:flex;background:var(--card2);border-radius:9px;padding:2px;gap:2px}
+.seg button{flex:1;height:32px;border-radius:7px;font-size:14px;font-weight:500;color:var(--text);transition:background .2s,box-shadow .2s}
+.seg button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12),0 1px 1px rgba(0,0,0,.04);font-weight:600}
+[data-theme=dark] .seg button.on{background:#636366}
+.seg .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-left:6px;vertical-align:2px}
+.dia{margin:18px 4px 8px;font-size:13px;font-weight:600;color:var(--sub);text-transform:capitalize}
+.sal{display:flex;align-items:center;gap:12px;padding:10px 14px;min-height:62px;width:100%;text-align:left;position:relative}
+.sal+.sal::before{content:"";position:absolute;top:0;left:64px;right:0;height:.5px;background:var(--sep)}
+.sal:active{background:var(--card2)}
+.sal .tx{flex:1;min-width:0}.sal .tx b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:14.5px;font-weight:500;line-height:1.25;word-break:break-word}
+.sal .tx span{display:block;font-size:12.5px;color:var(--sub);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sal .ok{color:var(--green)}
 .who{display:flex;align-items:center;gap:12px}
 .av{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#5B9BF8,#1E3A8A);color:#fff;display:grid;place-items:center;font-weight:600;flex:none}
 </style>
@@ -363,8 +379,9 @@ button.row:active{background:var(--card2)}
 <section class="view" id="v-resultados">
   <div class="top"><div class="rt" style="min-width:70px"></div><div class="ttl">Resultados</div><div class="rt"></div></div>
   <h1 class="big">Resultados</h1>
-  <p class="lead">Lo que tu PC terminó. También queda una copia en SALIDAS de tu computadora.</p>
-  <div id="l-res"></div>
+  <div class="seg" id="seg-res" style="margin:4px 0 14px"><button data-s="cel" class="on">Del celular</button><button data-s="pc">Salidas de la PC<span class="dot hide" id="dot-pc"></span></button></div>
+  <div id="p-cel"><p class="lead">Lo que pediste desde el celular. También queda copia en SALIDAS de tu computadora.</p><div id="l-res"></div></div>
+  <div id="p-pc" class="hide"><p class="lead">Lo que hiciste en tu computadora. Se puede bajar durante 7 días; luego JASAN lo borra de la nube.</p><div id="l-sal"></div></div>
 </section>
 
 <!-- ======================= AJUSTES ======================= -->
@@ -373,6 +390,11 @@ button.row:active{background:var(--card2)}
   <h1 class="big">Ajustes</h1>
   <div class="list" style="margin-top:12px"><div class="row"><div class="who"><span class="av" id="a-ini">J</span>
     <div class="tx"><b id="a-nom" style="font-size:17px"></b><span id="a-rol"></span></div></div></div></div>
+  <div class="sec">Apariencia</div>
+  <div class="list"><div class="row" style="display:block">
+    <div class="seg" id="tema"><button data-t="auto">Automático</button><button data-t="light">Día</button><button data-t="dark">Noche</button></div>
+  </div></div>
+  <p class="foot">Automático sigue el modo del celular.</p>
   <div class="sec">Este celular</div>
   <div class="list plain">
     <div class="row"><div class="tx"><b>Computadora</b></div><span class="tag" id="a-pc">—</span></div>
@@ -381,7 +403,7 @@ button.row:active{background:var(--card2)}
   </div>
   <div class="sec">Seguridad</div>
   <div class="list plain">
-    <div class="row"><div class="tx"><b>Cifrado de extremo a extremo</b><span>Tus archivos viajan cerrados con la clave de este celular. Se borran de la nube al descargarlos (o a los 7 días).</span></div></div>
+    <div class="row"><div class="tx"><b>Cifrado de extremo a extremo</b><span>Tus archivos viajan cerrados con la clave de este celular. Lo pedido desde el celular se borra de la nube al recibirlo; las Salidas de tu PC, a los 7 días.</span></div></div>
   </div>
   <div style="margin-top:22px"><button class="btn gray" id="b-borrar">Borrar resultados del celular</button></div>
   <div style="margin-top:10px"><button class="btn red" id="b-desv">Desvincular este celular</button></div>
