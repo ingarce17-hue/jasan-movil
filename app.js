@@ -5,7 +5,7 @@
      clave   = sha256("jasan-movil-k|"+t) → AES-256-GCM; blob = nonce12 | cifrado | tag16
      rutas   movil/<caja>/pedidos/<id>.bin · resultados/<id>.bin · pc.bin · anulado            */
 "use strict";
-const VERSION = "1.5 (JASAN 2.40.2)";
+const VERSION = "1.6 (JASAN 2.40.3)";
 const BUCKET = "jasan", TOPE_MB = 15, VIVO_SEG = 90;
 const $ = (q, el = document) => el.querySelector(q);
 const $$ = (q, el = document) => [...el.querySelectorAll(q)];
@@ -129,7 +129,7 @@ const UI = {
     $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + id));
     this.actual = id; window.scrollTo(0, 0);
     $("#tabs").classList.toggle("hide", !tab);
-    $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === id || (["cuadro", "req", "cotiz", "enviar"].includes(id) && b.dataset.tab === "inicio")));
+    $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === id || (["cuadro", "req", "cotiz", "enviar", "chats", "chat", "ia", "avisos"].includes(id) && b.dataset.tab === "inicio")));
     if (id === "resultados") pintarResultados();
     if (id === "ajustes") pintarAjustes();
   },
@@ -161,9 +161,9 @@ const ACT = {
     ["conf", "Conformidad", "Los datos desde el celular, la firma en la PC", "i-check", "#22A653", false, "Conformidad"]
   ],
   solo: [
-    ["chat", "Chat", "Con tu equipo de JASAN", "i-chat", "#34C759", false, "Chat"],
-    ["ia", "Consultar a la IA", "Criterios, normas, precios", "i-spark", "#AF52DE", false, "Consultar IA"],
-    ["avisos", "Avisos", "Lo que publica tu administrador", "i-bell", "#FF9500", false, "Avisos"]
+    ["chat", "Chat", "Con tu equipo de JASAN", "i-chat", "#34C759", true, "Chat"],
+    ["ia", "Consultar a la IA", "Criterios, normas, precios", "i-spark", "#AF52DE", true, "Consultar IA"],
+    ["avisos", "Avisos", "Lo que publica tu administrador", "i-bell", "#FF9500", true, "Avisos"]
   ],
   pc: [
     ["pdf", "Editor de PDF", "", "i-pdf", "#E5484D", false, "PDF"],
@@ -192,6 +192,9 @@ function pintarActividades() {
   }
 }
 function abrirActividad(id) {
+  if (id === "chat") return abrirChat();
+  if (id === "ia") { UI.ver("ia", { tab: false, empujar: true }); return pintarIA(); }
+  if (id === "avisos") { UI.ver("avisos", { tab: false, empujar: true }); return pintarAvisos(); }
   const v = { cuadro: "cuadro", req: "req", cotiz: "cotiz", enviar: "enviar" }[id];
   if (!v) return;
   if (v === "req") ultimoCuadro();
@@ -204,13 +207,14 @@ document.addEventListener("click", e => {
 });
 
 // ---------------------------------------------------------------- estado de la PC
-let pcVivo = null;
+let pcVivo = null, PCI = null;
 async function revisarPC() {
   if (!vin) return;
   try {
     if (await Nube.get(ruta("anulado"))) return desvinculado();
     const b = await Nube.get(ruta("pc.bin"));
     const pc = b ? await descifrar(b) : null;
+    if (pc) { PCI = pc; ponerLS("jasan.pci", JSON.stringify({ usuario: pc.usuario, nombre: pc.nombre, rol: pc.rol, avisos: pc.avisos || [] })); pintarPuntos(); }
     const vivo = pc && (Date.now() - new Date(pc.visto).getTime()) / 1000 < VIVO_SEG;
     pcVivo = !!vivo;
     $("#pc").classList.toggle("on", !!vivo);
@@ -420,9 +424,10 @@ async function traerResultados() {
       let r; try { r = await descifrar(b); } catch { await Nube.remove([p]); continue; }
       const prev = locales[id] || {};
       if (r.estado === "trabajando") { if (prev.estado !== "trabajando") await DB.poner({ ...prev, id, estado: "trabajando", titulo: prev.titulo || "Pedido" }); continue; }
-      await DB.poner({ ...r, id, nuevo: true, recibido: new Date().toISOString() });
+      await DB.poner({ ...prev, ...r, id, nuevo: r.tipo !== "ia" || UI.actual !== "ia", recibido: new Date().toISOString() });
+      if (r.tipo === "ia" && UI.actual === "ia") pintarIA();
       await Nube.remove([p]);                         // no cargar la nube: ya está en el celular
-      nuevos++;
+      if (r.tipo !== "ia") nuevos++;
     }
   } catch {}
   return nuevos;
@@ -433,14 +438,15 @@ function vigilar(rapido) {
     const n = await traerResultados();
     if (n) { UI.toast(n === 1 ? "Llegó un resultado" : `Llegaron ${n} resultados`); try { navigator.vibrate && navigator.vibrate(30); } catch {} }
     if (!document.hidden) await traerSalidas();
-    await pintarBadge(); if (UI.actual === "resultados") pintarResultados();
+    await pintarBadge(); if (UI.actual === "resultados") pintarResultados(); else pintarHero();
+    if (UI.actual === "ia") pintarIA();
     const pend = (await DB.todos()).some(x => x.estado === "espera" || x.estado === "trabajando");
     vigilando = setTimeout(paso, pend ? 6000 : 30000);
   };
   vigilando = setTimeout(paso, rapido ? 2500 : 0);
 }
 async function pintarBadge() {
-  const n = (await DB.todos()).filter(x => x.nuevo).length + salNuevas();
+  const n = (await DB.todos()).filter(x => x.nuevo && x.tipo !== "ia").length + salNuevas();
   $("#badge").textContent = n; $("#badge").classList.toggle("hide", !n);
 }
 const ESTADO = { listo: "Listo", observado: "Observado", error: "No se hizo", espera: "Enviado", trabajando: "Tu PC lo hace" };
@@ -449,7 +455,7 @@ function clase(nombre) { const e = nombre.split(".").pop().toLowerCase();
   if (["txt", "csv", "zip", "jpg", "jpeg", "png", "pptx"].includes(e)) return ["txt", e.toUpperCase().slice(0, 4)];
   return ["", e.toUpperCase().slice(0, 4)]; }
 async function pintarResultados() {
-  const lista = (await DB.todos()).sort((a, b) => String(b.pedido || "").localeCompare(String(a.pedido || "")));
+  const lista = (await DB.todos()).filter(x => x.tipo !== "ia").sort((a, b) => String(b.pedido || "").localeCompare(String(a.pedido || "")));
   const cont = $("#l-res"); cont.innerHTML = "";
   if (!lista.length) {
     cont.innerHTML = `<div class="empty"><svg><use href="#i-tray"/></svg><b>Todavía no hay resultados</b>Envía un cuadro de requerimientos y aquí lo recibirás.</div>`;
@@ -495,6 +501,7 @@ async function pintarResultados() {
     cont.appendChild(el);
   }
   if (lista.some(x => x.nuevo)) { for (const x of lista) if (x.nuevo) { x.nuevo = false; await DB.poner(x); } setTimeout(pintarBadge, 400); }
+  pintarHero();
 }
 const MIME = { xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", pdf: "application/pdf",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", txt: "text/plain",
@@ -527,6 +534,158 @@ function guardar(files) {
 async function quitar(r) {
   if (r.estado === "espera") { try { await Nube.remove([ruta(`pedidos/${r.id}.bin`)]); } catch {} }
   await DB.quitar(r.id); pintarResultados(); pintarBadge();
+}
+
+
+// ---------------------------------------------------------------- inicio: «Lo último»
+const NOMBRE_TIPO = { cuadro: "Cuadro de requerimientos", requerimientos: "Requerimientos", cotizaciones: "Cotizaciones", archivos: "A mi PC" };
+async function pintarHero() {
+  const h = $("#hero"); if (!h) return;
+  const l = (await DB.todos()).filter(x => x.tipo !== "ia").sort((a, b) => String(b.pedido || "").localeCompare(String(a.pedido || "")));
+  const pend = l.find(x => x.estado === "espera" || x.estado === "trabajando");
+  const ult = l.find(x => x.estado === "listo" || x.estado === "observado");
+  const deco = `<svg class="deco" viewBox="0 0 100 100"><use href="#mark"/></svg>`;
+  if (pend) {
+    h.innerHTML = `<h3>${pend.estado === "espera" ? "Enviado a tu PC" : "Tu PC lo está haciendo"}</h3>
+      <p>${esc(NOMBRE_TIPO[pend.tipo] || pend.titulo)} · ${esc(pend.resumen || "")}</p><div class="bar"><i></i></div>
+      <div class="acc"><button class="go" data-hero="res">Ver avance <svg width="8" height="14"><use href="#i-chev"/></svg></button></div>${deco}`;
+  } else if (ult && Date.now() - new Date(ult.hecho || ult.pedido).getTime() < 3 * 864e5) {
+    h.innerHTML = `<h3>${esc(ult.titulo)}</h3><p>${esc(NOMBRE_TIPO[ult.tipo] || "")} · ${ult.estado === "listo" ? "listo" : "con observaciones"} · ${esc(hace(ult.hecho || ult.pedido))}</p>
+      <div class="acc"><button class="go" data-hero="res">Ver</button>${(ult.archivos || []).length ? '<button class="go alt" data-hero="comp"><svg width="15" height="15"><use href="#i-share"/></svg> Compartir</button>' : ""}</div>${deco}`;
+    const c = h.querySelector('[data-hero="comp"]'); if (c) c.onclick = () => acciones(ult.archivos.map(archivoDe));
+  } else {
+    h.innerHTML = `<h3>¿Qué hacemos hoy?</h3><p>Tu PC con JASAN lo hace por ti: manda fotos, pide un cuadro o consulta a la IA.</p>
+      <div class="acc"><button class="go" data-hero="foto"><svg width="15" height="15"><use href="#i-plus"/></svg> Tomar foto</button><button class="go alt" data-hero="ia"><svg width="15" height="15"><use href="#i-spark"/></svg> Preguntar a la IA</button></div>${deco}`;
+  }
+  $$("[data-hero]", h).forEach(b => { if (b.dataset.hero === "comp") return; b.onclick = () => {
+    const k = b.dataset.hero;
+    if (k === "res") { UI.ver("resultados"); verPanel("cel"); }
+    else if (k === "foto") { UI.ver("enviar", { tab: false, empujar: true }); $("#f-foto").click(); }
+    else if (k === "ia") abrirActividad("ia");
+  }; });
+}
+
+// ---------------------------------------------------------------- chat (tabla jasan_chat de la nube, como en la PC)
+function pci() { if (PCI) return PCI; try { return JSON.parse(leerLS("jasan.pci", "null")); } catch { return null; } }
+const Chat = {
+  h(extra = {}) { return { apikey: vin.k, Authorization: "Bearer " + vin.k, "Content-Type": "application/json", ...extra }; },
+  async get(q) { const r = await fetch(`${vin.u}/rest/v1/jasan_chat?${q}`, { headers: this.h(), cache: "no-store" }); if (!r.ok) throw new Error("chat " + r.status); return r.json(); },
+  desde() { return encodeURIComponent(new Date(Date.now() - 30 * 864e5).toISOString().replace(/\.\d+Z$/, "+00:00")); },
+  async hilo(h) { const rows = await this.get(`select=*&order=id.desc&limit=300&creado=gt.${this.desde()}&hilo=eq.${encodeURIComponent(h)}`); return rows.reverse(); },
+  async todos() { return (await this.get(`select=*&order=id.desc&limit=600&creado=gt.${this.desde()}`)).reverse(); },
+  async enviar(hilo, texto) {
+    const u = pci();
+    const r = await fetch(`${vin.u}/rest/v1/jasan_chat?select=*`, { method: "POST", headers: this.h({ Prefer: "return=representation" }),
+      body: JSON.stringify({ hilo, autor: u.usuario, nombre: u.nombre || vin.n, de_admin: u.rol === "admin", texto }) });
+    if (!r.ok) throw new Error("chat " + r.status); return (await r.json())[0];
+  },
+  async leidos(hilo, deAdmin) {
+    await fetch(`${vin.u}/rest/v1/jasan_chat?hilo=eq.${encodeURIComponent(hilo)}&de_admin=eq.${deAdmin}&leido=eq.false`,
+      { method: "PATCH", headers: this.h({ Prefer: "return=minimal" }), body: JSON.stringify({ leido: true }) }).catch(() => {});
+  }
+};
+let hiloAct = null, chatT = null;
+const esAdmin = () => (pci() || {}).rol === "admin";
+async function abrirChat() {
+  const u = pci();
+  if (!u || !u.usuario) return UI.hoja({ icono: "i-chat", color: "#34C759", titulo: "Falta un paso", texto: "Abre JASAN en tu computadora con tu usuario (con la actualización 2.40.3) y vuelve a entrar al chat." });
+  if (!esAdmin()) return abrirHilo(u.usuario, "Administración");
+  if (UI.actual !== "chats") UI.ver("chats", { tab: false, empujar: true });
+  const cont = $("#l-chats"); cont.innerHTML = `<div class="empty" style="padding:30px"><i class="spin mini" style="border-color:rgba(37,99,235,.25);border-top-color:var(--blue)"></i></div>`;
+  try {
+    const rows = await Chat.todos(), hs = {};
+    for (const r of rows) { const x = hs[r.hilo] || (hs[r.hilo] = { hilo: r.hilo, nombre: "", ult: null, sin: 0 });
+      if (!r.de_admin) x.nombre = r.nombre || r.autor; x.ult = r; if (!r.de_admin && !r.leido) x.sin++; }
+    const l = Object.values(hs).sort((a, b) => b.ult.id - a.ult.id);
+    cont.innerHTML = l.length ? "" : `<div class="empty"><svg><use href="#i-chat"/></svg><b>Sin conversaciones</b>En los últimos 30 días.</div>`;
+    for (const x of l) {
+      const b = document.createElement("button"); b.className = "row";
+      b.innerHTML = `<span class="av" style="width:40px;height:40px">${esc((x.nombre || x.hilo)[0].toUpperCase())}</span><span class="tx"><b>${esc(x.nombre || x.hilo)}</b><span>${esc(x.ult.texto.slice(0, 60))}</span></span>${x.sin ? `<span class="tag b">${x.sin}</span>` : `<span class="tag">${esc(hace(x.ult.creado))}</span>`}`;
+      b.onclick = () => abrirHilo(x.hilo, x.nombre || x.hilo); cont.appendChild(b);
+    }
+  } catch { cont.innerHTML = `<div class="empty"><b>No se pudo abrir el chat</b>Revisa tu internet o que el chat esté activado en JASAN.</div>`; }
+}
+async function abrirHilo(hilo, titulo) {
+  hiloAct = hilo; $("#chat-t").textContent = titulo;
+  UI.ver("chat", { tab: false, empujar: true });
+  $("#l-msg").innerHTML = ""; await pintarHilo(true);
+  clearInterval(chatT); chatT = setInterval(() => { if (UI.actual === "chat" && !document.hidden) pintarHilo(); else clearInterval(chatT); }, 5000);
+}
+let ultimoMsg = 0;
+async function pintarHilo(abajo) {
+  if (!hiloAct) return;
+  let rows; try { rows = await Chat.hilo(hiloAct); } catch { return; }
+  const yoAdmin = esAdmin(), cont = $("#l-msg");
+  const nuevo = rows.length ? rows[rows.length - 1].id : 0;
+  if (nuevo === ultimoMsg && cont.childElementCount) return;
+  ultimoMsg = nuevo; cont.innerHTML = "";
+  if (!rows.length) cont.innerHTML = `<div class="empty"><svg><use href="#i-chat"/></svg><b>Escribe el primer mensaje</b>${yoAdmin ? "" : "Le llega al administrador en JASAN."}</div>`;
+  let dia = "";
+  for (const r of rows) {
+    const d = new Date(r.creado), k = d.toDateString();
+    if (k !== dia) { dia = k; const t = document.createElement("div"); t.className = "dia2"; t.textContent = d.toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" }); cont.appendChild(t); }
+    const mio = r.de_admin === yoAdmin, b = document.createElement("div"); b.className = "bub " + (mio ? "yo" : "otro");
+    b.innerHTML = (!mio && yoAdmin ? "" : "") + esc(r.texto) + `<span class="q">${d.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}${mio && r.leido ? " · visto" : ""}</span>`;
+    cont.appendChild(b);
+  }
+  Chat.leidos(hiloAct, !yoAdmin);
+  if (abajo !== false) setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 30);
+}
+async function enviarChat() {
+  const t = $("#chat-in").value.trim(); if (!t || !hiloAct) return;
+  $("#chat-send").disabled = true;
+  try { await Chat.enviar(hiloAct, t.slice(0, 2000)); $("#chat-in").value = ""; crecer($("#chat-in")); ultimoMsg = 0; await pintarHilo(true); }
+  catch { UI.toast(navigator.onLine ? "No se pudo enviar el mensaje" : "Sin internet"); }
+  finally { $("#chat-send").disabled = false; }
+}
+function crecer(t) { t.style.height = "auto"; t.style.height = Math.min(120, t.scrollHeight) + "px"; }
+
+// ---------------------------------------------------------------- consultar a la IA (la PC pregunta con tu clave)
+async function pintarIA() {
+  const l = (await DB.todos()).filter(x => x.tipo === "ia" && !x.oculto).sort((a, b) => String(a.pedido).localeCompare(String(b.pedido)));
+  const cont = $("#l-ia"); cont.innerHTML = "";
+  if (!l.length) cont.innerHTML = `<div class="empty"><svg><use href="#i-spark"/></svg><b>Pregúntale a la IA de JASAN</b>Responde tu PC, con tu clave y los criterios que le enseñaste.<br><br>Ej.: «¿Qué documentos pide la conformidad de un servicio?»</div>`;
+  for (const x of l) {
+    const q = document.createElement("div"); q.className = "bub yo"; q.textContent = x.pregunta || ""; cont.appendChild(q);
+    if (x.estado === "espera" || x.estado === "trabajando") { const p = document.createElement("div"); p.className = "pens"; p.innerHTML = "<i></i><i></i><i></i>"; cont.appendChild(p); }
+    else { const a = document.createElement("div"); a.className = "bub otro"; a.innerHTML = esc(x.estado === "listo" ? x.resumen : `${x.titulo}. ${x.resumen}`) + (x.fuente ? `<span class="q">${esc(x.fuente)}</span>` : ""); cont.appendChild(a); }
+  }
+  for (const x of l) if (x.nuevo) { x.nuevo = false; await DB.poner(x); }
+  setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 30);
+}
+async function enviarIA() {
+  const t = $("#ia-in").value.trim(); if (!t) return;
+  const prev = (await DB.todos()).filter(x => x.tipo === "ia" && !x.oculto && x.estado === "listo").sort((a, b) => String(a.pedido).localeCompare(String(b.pedido))).slice(-5);
+  const historial = prev.flatMap(x => [["yo", x.pregunta || ""], ["ia", x.resumen || ""]]);
+  $("#ia-send").disabled = true;
+  try {
+    const id = nuevoId(), creado = isoLocal();
+    await Nube.put(ruta(`pedidos/${id}.bin`), await cifrar({ tipo: "ia", creado, datos: { pregunta: t, historial }, archivos: [] }));
+    await DB.poner({ id, tipo: "ia", estado: "espera", titulo: "Consulta", pregunta: t, resumen: "", pedido: creado, archivos: [] });
+    $("#ia-in").value = ""; crecer($("#ia-in")); pintarIA(); vigilar(true);
+    if (!pcVivo) UI.toast("Tu PC no está conectada: responderá al conectarse", 3200);
+  } catch { UI.toast(navigator.onLine ? "No se pudo enviar" : "Sin internet"); }
+  finally { $("#ia-send").disabled = false; }
+}
+
+// ---------------------------------------------------------------- avisos del administrador
+const NIVEL = { info: "Informativo", important: "Importante", urgent: "Urgente" };
+function avisosNuevos() { const v = new Set(JSON.parse(leerLS("jasan.avisosvistos", "[]"))); return ((pci() || {}).avisos || []).filter(a => !v.has(a.id)).length; }
+function pintarPuntos() {
+  const n = avisosNuevos(), b = $$("#l-solo .app").find(x => x.getAttribute("aria-label") === "Avisos");
+  if (!b) return; let d = b.querySelector(".pill.n");
+  if (n && !d) { d = document.createElement("span"); d.className = "pill n"; d.style.cssText = "background:var(--red);color:#fff;box-shadow:none"; b.appendChild(d); }
+  if (d) { if (n) d.textContent = n; else d.remove(); }
+}
+function pintarAvisos() {
+  const l = ((pci() || {}).avisos || []), cont = $("#l-avisos"); cont.innerHTML = "";
+  if (!l.length) cont.innerHTML = `<div class="empty"><svg><use href="#i-bell"/></svg><b>No hay avisos vigentes</b>${pci() ? "" : "Abre JASAN en tu PC para traerlos."}</div>`;
+  for (const a of l) {
+    const e = document.createElement("div"); e.className = "aviso " + (a.level || "info");
+    e.innerHTML = `<b>${esc(a.title)}</b><p>${esc(a.body)}</p><span>${esc(NIVEL[a.level] || "Aviso")} · ${esc(a.by || "")} · ${esc(hace(a.created))}${a.expires ? " · hasta el " + esc(a.expires) : ""}</span>`;
+    cont.appendChild(e);
+  }
+  ponerLS("jasan.avisosvistos", JSON.stringify(l.map(a => a.id))); pintarPuntos();
 }
 
 // ---------------------------------------------------------------- salidas de la PC (7 días en la nube)
@@ -662,6 +821,48 @@ $("#b-instalar").onclick = async () => { if (!promptInstalar) return; promptInst
 $("#b-seguir").onclick = () => { try { sessionStorage.setItem("jasan.seguir", "1"); } catch {} entrar(); };
 addEventListener("appinstalled", () => entrar());
 
+// ---------------------------------------------------------------- jalar hacia abajo para actualizar
+const PTR = { y0: null, d: 0, ocupado: false, UMBRAL: 70 };
+function ptrPintar(d, trans) {
+  const el = $("#ptr"); el.style.transition = trans ? "transform .25s, opacity .25s" : "none";
+  const y = Math.min(d, 110) * 0.55 - 60 + 40;
+  el.style.transform = `translateY(${d ? y : -60}px) rotate(${d * 2.2}deg)`; el.style.opacity = d ? Math.min(1, d / 50) : 0;
+  el.classList.toggle("listo", d >= PTR.UMBRAL);
+}
+addEventListener("touchstart", e => {
+  if (PTR.ocupado || window.scrollY > 0 || $("#sheet").classList.contains("on") || ["vincular", "instalar"].includes(UI.actual)) { PTR.y0 = null; return; }
+  PTR.y0 = e.touches[0].clientY; PTR.d = 0;
+}, { passive: true });
+addEventListener("touchmove", e => {
+  if (PTR.y0 === null) return;
+  const d = e.touches[0].clientY - PTR.y0;
+  if (d <= 0 || window.scrollY > 0) { PTR.d = 0; ptrPintar(0); return; }
+  PTR.d = d * 0.6; ptrPintar(PTR.d);
+}, { passive: true });
+addEventListener("touchend", async () => {
+  if (PTR.y0 === null) return;
+  PTR.y0 = null;
+  if (PTR.d < PTR.UMBRAL) { PTR.d = 0; return ptrPintar(0, true); }
+  PTR.ocupado = true; const el = $("#ptr"); el.classList.remove("listo"); el.classList.add("girando");
+  el.style.transition = "transform .2s"; el.style.transform = "translateY(22px)";
+  try { await actualizarTodo(); } finally {
+    setTimeout(() => { el.classList.remove("girando"); PTR.d = 0; ptrPintar(0, true); PTR.ocupado = false; }, 350);
+  }
+});
+async function actualizarTodo() {
+  if (!vin) return;
+  try { const reg = await navigator.serviceWorker?.getRegistration(); reg && reg.update().catch(() => {}); } catch {}
+  await Promise.all([revisarPC(), traerResultados().then(n => n && UI.toast(n === 1 ? "Llegó un resultado" : `Llegaron ${n} resultados`)), traerSalidas()]);
+  await pintarBadge(); pintarHero();
+  const v = UI.actual;
+  if (v === "resultados") { pintarResultados(); if (panelRes === "pc") pintarSalidas(); }
+  else if (v === "chat") { ultimoMsg = 0; await pintarHilo(false); }
+  else if (v === "chats") await abrirChat();
+  else if (v === "ia") pintarIA();
+  else if (v === "avisos") pintarAvisos();
+  else if (v === "ajustes") pintarAjustes();
+}
+
 // ---------------------------------------------------------------- arranque
 function primerNombre() { const n = (vin && vin.n || "").replace(/^(ing|arq|lic|dr|sr|sra)\.?\s+/i, "").trim(); return n.split(/\s+/)[0] || "de nuevo"; }
 function entrar() {
@@ -669,7 +870,7 @@ function entrar() {
   $("#hola").textContent = `${h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches"}, ${primerNombre()}`;
   const f = new Date().toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" });
   $("#hoy").textContent = f.charAt(0).toUpperCase() + f.slice(1);
-  UI.ver("inicio"); revisarPC(); vigilar(false);
+  UI.ver("inicio"); revisarPC(); vigilar(false); pintarHero();
   clearInterval(entrar._t); entrar._t = setInterval(() => { if (!document.hidden) revisarPC(); }, 20000);
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden && vin) { revisarPC(); vigilar(false); } });
@@ -682,6 +883,13 @@ $("#b-pegar").onclick = async () => {
 let recargando = false;
 async function iniciar() {
   pintarActividades(); prepararCuadro(); prepararReq(); prepararCotiz(); prepararEnviar();
+  $("#chat-send").onclick = enviarChat; $("#ia-send").onclick = enviarIA;
+  for (const [t, f] of [["#chat-in", enviarChat], ["#ia-in", enviarIA]]) {
+    $(t).addEventListener("input", e => crecer(e.target));
+    $(t).addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !/Android|iPhone|iPad/i.test(navigator.userAgent)) { e.preventDefault(); f(); } });
+  }
+  $("#ia-nueva").onclick = async () => { for (const x of await DB.todos()) if (x.tipo === "ia") { x.oculto = true; await DB.poner(x); } pintarIA(); };
+  pintarHero(); pintarPuntos();
   const t0 = Date.now();
   const delEnlace = V.deEnlace(location.hash);
   let v = V.leer();
