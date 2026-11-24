@@ -5,7 +5,7 @@
      clave   = sha256("jasan-movil-k|"+t) → AES-256-GCM; blob = nonce12 | cifrado | tag16
      rutas   movil/<caja>/pedidos/<id>.bin · resultados/<id>.bin · pc.bin · anulado            */
 "use strict";
-const VERSION = "1.7 (JASAN 2.40.4)";
+const VERSION = "1.8 (JASAN 2.47.60)";
 const BUCKET = "jasan", TOPE_MB = 15, VIVO_SEG = 90;
 const $ = (q, el = document) => el.querySelector(q);
 const $$ = (q, el = document) => [...el.querySelectorAll(q)];
@@ -129,7 +129,8 @@ const UI = {
     $$(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + id));
     this.actual = id; window.scrollTo(0, 0);
     $("#tabs").classList.toggle("hide", !tab);
-    $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === id || (["cuadro", "req", "cotiz", "enviar", "chats", "chat", "ia", "avisos", "borr"].includes(id) && b.dataset.tab === "inicio")));
+    $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === id || (["cuadro", "req", "cotiz", "enviar", "chats", "chat", "ia", "avisos", "borr", "control"].includes(id) && b.dataset.tab === "inicio")));
+    if (id !== "control") pararControl();
     if (id === "resultados") pintarResultados();
     if (id === "ajustes") pintarAjustes();
   },
@@ -161,6 +162,7 @@ const ACT = {
     ["conf", "Conformidad", "Fotos o PDF de los documentos → Conformidad en la PC", "i-check", "#22A653", true, "Conformidad"]
   ],
   solo: [
+    ["control", "Control remoto", "Volumen y canales de tu PC", "i-remote", "#111827", true, "Control"],
     ["chat", "Chat", "Con tu equipo de JASAN", "i-chat", "#34C759", true, "Chat"],
     ["ia", "Consultar a la IA", "Criterios, normas, precios", "i-spark", "#AF52DE", true, "Consultar IA"],
     ["avisos", "Avisos", "Lo que publica tu administrador", "i-bell", "#FF9500", true, "Avisos"]
@@ -194,6 +196,7 @@ function pintarActividades() {
 function abrirActividad(id) {
   if (["cartas", "tdr", "valor", "conf"].includes(id)) return abrirBorrador(id);
   if (id === "chat") return abrirChat();
+  if (id === "control") return abrirControl();
   if (id === "ia") { UI.ver("ia", { tab: false, empujar: true }); return pintarIA(); }
   if (id === "avisos") { UI.ver("avisos", { tab: false, empujar: true }); return pintarAvisos(); }
   const v = { cuadro: "cuadro", req: "req", cotiz: "cotiz", enviar: "enviar" }[id];
@@ -206,6 +209,69 @@ document.addEventListener("click", e => {
   if (e.target.closest("[data-atras]")) UI.atras();
   const tb = e.target.closest("[data-tab]"); if (tb) UI.ver(tb.dataset.tab);
 });
+
+// ---------------------------------------------------------------- control remoto (2.47.60)
+/* Órdenes en movil/<caja>/control.bin (cifrado): {cmds:[{id,t,c,n,arg}]} — las últimas 25.
+   La PC responde en control_pc.bin: canal, favoritos, enlace del modo rápido (WiFi). */
+const RC = { cmds: [], t: null, ult: "", lan: "", envio: null, rep: null, pend: 0 };
+function rcOrden(c, extra = {}) {
+  if (c === "vol" && RC.cmds.length) {                // volumen seguido: se suma a la última orden aún no enviada
+    const u = RC.cmds[RC.cmds.length - 1];
+    if (u.c === "vol" && !u.ida && Math.sign(u.n) === Math.sign(extra.n)) { u.n += extra.n; return rcEnviar(); }
+  }
+  RC.cmds.push({ id: nuevoId(), t: Date.now(), c, ...extra });
+  RC.cmds = RC.cmds.slice(-25);
+  rcEnviar();
+}
+function rcEnviar() {                                  // juntar los toques de ~150 ms en un solo envío
+  clearTimeout(RC.envio);
+  RC.envio = setTimeout(async () => {
+    RC.cmds.forEach(x => x.ida = true);
+    try { await Nube.put(ruta("control.bin"), await cifrar({ cmds: RC.cmds.map(({ ida, ...x }) => x) }));
+      $("#rc-est").textContent = "Enviado a tu PC…"; rcPedirEstado(true); }
+    catch (e) { UI.toast(navigator.onLine ? "No se pudo enviar" : "Sin internet"); }
+  }, 150);
+}
+async function rcEstado() {
+  try {
+    const b = await Nube.get(ruta("control_pc.bin"));
+    if (!b) return;
+    const d = await descifrar(b);
+    const vivo = (Date.now() / 1000 - (d.t || 0)) < 600;
+    $("#rc-canal").textContent = d.canal || "Relax y TV";
+    $("#rc-est").textContent = !vivo ? "Tu PC aún no responde (abre JASAN)" : d.viendo ? "En vivo en tu PC" : (d.canal ? "Detenido" : "Elige un favorito");
+    RC.lan = d.lan || ""; $("#rc-wifi").classList.toggle("hide", !RC.lan);
+
+    const el = $("#rc-favs"); el.innerHTML = "";
+    if (!d.tv) { el.innerHTML = '<p class="lead">Relax y TV no está activo en tu PC.</p>'; return; }
+    if (d.cargando) { el.innerHTML = '<p class="lead">Tu PC está cargando los canales…</p>'; return; }
+    if (!(d.favs || []).length) { el.innerHTML = '<p class="lead">Aún no tienes favoritos. En Relax y TV de la PC toca la ★ de un canal.</p>'; return; }
+    for (const f of d.favs) {
+      const b = document.createElement("button"); b.className = "rc-fav" + (f.k === d.clave ? " on" : "");
+      b.innerHTML = `${esc(f.n)}<span>${esc(f.p || "")}</span>`;
+      b.onclick = () => { $$(".rc-fav").forEach(x => x.classList.remove("on")); b.classList.add("on"); $("#rc-canal").textContent = f.n; rcOrden("canal", { arg: f.k }); };
+      el.appendChild(b);
+    }
+  } catch (e) { $("#rc-est").textContent = navigator.onLine ? "No se pudo consultar a tu PC" : "Sin internet"; }
+}
+function rcPedirEstado(pronto) {                       // tras una orden: mirar la respuesta de la PC en 1.5 y 4 s
+  if (pronto) { setTimeout(rcEstado, 1500); setTimeout(rcEstado, 4000); }
+}
+function abrirControl() {
+  UI.ver("control", { tab: false, empujar: true });
+  rcOrden("hola");                                     // la PC se pone «rápida» antes del primer botón
+  rcEstado(); clearInterval(RC.t); RC.t = setInterval(rcEstado, 5000);
+}
+function pararControl() { clearInterval(RC.t); RC.t = null; clearInterval(RC.rep); }
+$$("[data-rc]").forEach(b => {
+  const c = b.dataset.rc, n = Number(b.dataset.n || 0);
+  const una = () => c === "vol" ? rcOrden("vol", { n }) : rcOrden(c);
+  if (c === "vol") {                                   // mantener apretado: sigue subiendo / bajando
+    b.addEventListener("pointerdown", e => { e.preventDefault(); una(); clearInterval(RC.rep); RC.rep = setInterval(una, 250); });
+    ["pointerup", "pointerleave", "pointercancel"].forEach(ev => b.addEventListener(ev, () => clearInterval(RC.rep)));
+  } else b.onclick = una;
+});
+$("#rc-wifi").onclick = () => { if (RC.lan) location.href = RC.lan; };
 
 // ---------------------------------------------------------------- estado de la PC
 let pcVivo = null, PCI = null;

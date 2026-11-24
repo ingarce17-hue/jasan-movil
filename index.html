@@ -81,6 +81,17 @@ button{cursor:pointer;border:0;background:none;padding:0}
 .top .rt{min-width:70px;text-align:right}
 h1.big{font-size:24px;font-weight:700;letter-spacing:-.015em;margin:4px 0 2px}
 .lead{color:var(--sub);margin:0 0 10px;font-size:13.5px}
+/* control remoto (2.47.60) */
+.rc-now{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:14px 16px;margin:4px 0 12px}
+.rc-now small{color:var(--sub);font-size:12px}.rc-now b{display:block;font-size:19px;font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rc-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:8px}
+.rc-pad button{height:64px;border:0;border-radius:16px;background:var(--card);box-shadow:var(--shadow);color:var(--text);font:600 15px var(--font);touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.rc-pad button:active{background:var(--blueSoft);transform:scale(.97)}
+.rc-pad .g{font-size:30px;font-weight:500}.rc-pad .p{background:var(--blue);color:#fff}
+.rc-fav{display:flex;justify-content:space-between;align-items:center;width:100%;border:0;background:var(--card);border-radius:14px;box-shadow:var(--shadow);
+ padding:14px 16px;margin:0 0 8px;font:500 15px var(--font);color:var(--text);text-align:left}
+.rc-fav span{color:var(--sub);font-size:12px;font-weight:400}.rc-fav.on{background:var(--blueSoft);color:var(--blue)}
+.rc-fav:active{transform:scale(.98)}
 
 .sec{margin:16px 0 6px 14px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub)}
 .foot{margin:6px 14px 0;font-size:12px;color:var(--sub)}
@@ -307,6 +318,7 @@ button.row:active{background:var(--card2)}
     <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
     <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l2.2 6.3L20.5 12l-6.3 2.2L12 20.5l-2.2-6.3L3.5 12l6.3-2.7z" fill="currentColor"/></symbol>
     <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z M10 20.5h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-remote" viewBox="0 0 24 24"><path d="M8 2.5h8a2 2 0 0 1 2 2v15a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-15a2 2 0 0 1 2-2z M12 6.5v.01 M10 10.5h4 M12 8.5v4 M10 16h.01 M14 16h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
     <symbol id="i-pc" viewBox="0 0 24 24"><path d="M3 4.5h18v11.5H3z M8.5 20h7 M12 16v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
     <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z M14 3v4h4 M9 13h6 M9 17h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
     <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 4v16 M6 20h12 M5 8h14 M5 8l-2.5 6a2.5 2.5 0 0 0 5 0z M19 8l-2.5 6a2.5 2.5 0 0 0 5 0z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
@@ -540,6 +552,21 @@ button.row:active{background:var(--card2)}
   <div class="top"><button class="bk" data-atras><svg><use href="#i-back"/></svg>Inicio</button><div class="ttl" style="opacity:1">Consultar a la IA</div><div class="rt"><button class="link" id="ia-nueva" style="font-size:15px">Nueva</button></div></div>
   <div id="l-ia" class="msgs"></div>
   <div class="composer"><textarea id="ia-in" rows="1" placeholder="Pregunta: normas, criterios, precios…"></textarea><button id="ia-send" aria-label="Preguntar"><svg width="20" height="20"><use href="#i-up"/></svg></button></div>
+</section>
+
+<!-- ======================= CONTROL REMOTO (2.47.60) ======================= -->
+<section class="view" id="v-control">
+  <div class="top"><button class="bk" data-atras><svg><use href="#i-back"/></svg>Inicio</button><div class="ttl">Control remoto</div><div class="rt"></div></div>
+  <h1 class="big">Control remoto</h1>
+  <div class="rc-now"><small id="rc-est">Conectando con tu PC…</small><b id="rc-canal">Relax y TV</b></div>
+  <div class="rc-pad">
+    <button class="g" data-rc="vol" data-n="-1" aria-label="Bajar volumen">−</button><button data-rc="mute">Silencio</button><button class="g" data-rc="vol" data-n="1" aria-label="Subir volumen">+</button>
+    <button data-rc="ant">◀ Canal</button><button class="p" data-rc="pausa">Pausa / ▶</button><button data-rc="sig">Canal ▶</button>
+  </div>
+  <button class="btn gray hide" id="rc-wifi" style="margin:6px 0 4px">Modo rápido (misma WiFi)</button>
+  <p class="foot" id="rc-nota" style="margin:0 0 10px"></p>
+  <div class="sec" style="margin-left:2px">Favoritos</div>
+  <div id="rc-favs"></div>
 </section>
 
 <!-- ======================= AVISOS ======================= -->
