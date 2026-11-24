@@ -81,17 +81,84 @@ button{cursor:pointer;border:0;background:none;padding:0}
 .top .rt{min-width:70px;text-align:right}
 h1.big{font-size:24px;font-weight:700;letter-spacing:-.015em;margin:4px 0 2px}
 .lead{color:var(--sub);margin:0 0 10px;font-size:13.5px}
-/* control remoto (2.47.60) */
-.rc-now{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:14px 16px;margin:4px 0 12px}
-.rc-now small{color:var(--sub);font-size:12px}.rc-now b{display:block;font-size:19px;font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rc-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:8px}
-.rc-pad button{height:64px;border:0;border-radius:16px;background:var(--card);box-shadow:var(--shadow);color:var(--text);font:600 15px var(--font);touch-action:manipulation;user-select:none;-webkit-user-select:none}
-.rc-pad button:active{background:var(--blueSoft);transform:scale(.97)}
-.rc-pad .g{font-size:30px;font-weight:500}.rc-pad .p{background:var(--blue);color:#fff}
-.rc-fav{display:flex;justify-content:space-between;align-items:center;width:100%;border:0;background:var(--card);border-radius:14px;box-shadow:var(--shadow);
- padding:14px 16px;margin:0 0 8px;font:500 15px var(--font);color:var(--text);text-align:left}
-.rc-fav span{color:var(--sub);font-size:12px;font-weight:400}.rc-fav.on{background:var(--blueSoft);color:var(--blue)}
-.rc-fav:active{transform:scale(.98)}
+/* control remoto (2.47.61) */
+/* RC-UI-CSS */
+.rc{--rc-card:rgba(255,255,255,.72);--rc-line:rgba(15,23,42,.08);--rc-tx:#0B1220;--rc-sub:#64748B;--rc-acc:#2563EB;
+ --rc-acc2:#22D3EE;--rc-face1:#FFFFFF;--rc-face2:#E7EDF7;--rc-bez1:#F8FAFC;--rc-bez2:#B9C3D3;--rc-tick:rgba(15,23,42,.14);
+ --rc-sh:0 10px 30px rgba(30,64,175,.10),0 1px 2px rgba(15,23,42,.06);--rc-btn:linear-gradient(180deg,#FFFFFF,#EEF2F8);
+ font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;color:var(--rc-tx);
+ -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.rc.osc,[data-theme=dark] .rc{--rc-card:rgba(22,27,38,.72);--rc-line:rgba(255,255,255,.07);--rc-tx:#F1F5F9;--rc-sub:#94A3B8;--rc-acc:#4C8DFF;
+ --rc-face1:#1B2233;--rc-face2:#0B0F18;--rc-bez1:#3A4458;--rc-bez2:#0E131D;--rc-tick:rgba(255,255,255,.12);
+ --rc-sh:0 12px 34px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.04);--rc-btn:linear-gradient(180deg,#252C3B,#141925)}
+.rc-card{background:var(--rc-card);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-radius:22px;
+ box-shadow:var(--rc-sh);border:1px solid var(--rc-line)}
+.rc-head{display:flex;align-items:center;gap:12px;padding:12px 14px;margin:2px 0 14px}
+.rc-ico{width:48px;height:48px;border-radius:14px;flex:none;display:grid;place-items:center;color:#fff;
+ background:linear-gradient(145deg,#60A5FA,#2563EB 55%,#1E3A8A);box-shadow:0 6px 16px rgba(37,99,235,.35),inset 0 1px 0 rgba(255,255,255,.35)}
+.rc-ico svg{width:26px;height:26px}
+.rc-ht{flex:1;min-width:0}.rc-ht b{display:block;font-size:19px;font-weight:650;letter-spacing:-.2px}
+.rc-ht span{display:block;font-size:13px;color:var(--rc-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.rc-pill{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 10px;border-radius:999px;
+ background:var(--rc-btn);border:1px solid var(--rc-line);white-space:nowrap}
+.rc-pill i{width:8px;height:8px;border-radius:50%;background:#94A3B8}
+.rc-pill.ok i{background:#22C55E;box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:rcLatido 2s infinite}
+@keyframes rcLatido{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+.rc-seg{position:relative;display:grid;grid-template-columns:1fr 1fr;padding:4px;border-radius:999px;margin:0 auto 6px;
+ width:min(260px,80%);background:var(--rc-btn);border:1px solid var(--rc-line)}
+.rc-seg button{position:relative;z-index:1;border:0;background:none;color:var(--rc-sub);font-family:inherit;font-size:14px;font-weight:600;padding:8px 0;
+ border-radius:999px;display:flex;gap:6px;align-items:center;justify-content:center;transition:color .25s}
+.rc-seg button.on{color:#fff}.rc-seg svg{width:16px;height:16px}
+.rc-seg .rc-sl{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);border-radius:999px;
+ background:linear-gradient(135deg,var(--rc-acc),#1D4ED8);box-shadow:0 4px 14px rgba(37,99,235,.45);transition:transform .35s cubic-bezier(.3,1.4,.5,1)}
+.rc-seg.b .rc-sl{transform:translateX(100%)}
+.rc-zona{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;margin:4px 0 6px}
+.rc-lado{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12.5px;color:var(--rc-sub);font-weight:500}
+.rc-red{width:62px;height:62px;border-radius:50%;border:1px solid var(--rc-line);background:var(--rc-btn);color:var(--rc-tx);
+ box-shadow:var(--rc-sh);display:grid;place-items:center;transition:transform .12s}
+.rc-red svg{width:26px;height:26px}.rc-red:active{transform:scale(.92)}
+.rc-red.on{color:#EF4444;box-shadow:0 0 0 2px rgba(239,68,68,.35),var(--rc-sh)}
+.rc-dial{position:relative;width:min(232px,60vw);aspect-ratio:1;border-radius:50%;touch-action:none;cursor:grab}
+.rc-bez{position:absolute;inset:0;border-radius:50%;
+ background:conic-gradient(from var(--rc-g,0deg),var(--rc-bez1),var(--rc-bez2) 25%,var(--rc-bez1) 50%,var(--rc-bez2) 75%,var(--rc-bez1));
+ box-shadow:0 18px 40px rgba(15,23,42,.22),inset 0 2px 2px rgba(255,255,255,.55)}
+.rc-dial svg.rc-arc{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.rc-face{position:absolute;inset:15%;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ background:radial-gradient(120% 120% at 30% 20%,var(--rc-face1),var(--rc-face2));
+ box-shadow:inset 0 2px 6px rgba(255,255,255,.35),inset 0 -10px 24px rgba(0,0,0,.18),0 6px 16px rgba(0,0,0,.18)}
+.rc-face::after{content:"";position:absolute;inset:6% 18% 55%;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,0));pointer-events:none}
+.rc.osc .rc-face::after,[data-theme=dark] .rc-face::after{background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,0))}
+.rc-face svg{width:24px;height:24px;color:var(--rc-acc)}
+.rc-num{font-size:44px;font-weight:700;letter-spacing:-1.5px;line-height:1;margin-top:4px;font-variant-numeric:tabular-nums}
+.rc-num small{font-size:20px;font-weight:600;margin-left:2px}
+.rc-et{font-size:11.5px;color:var(--rc-sub);margin-top:5px;font-weight:600;letter-spacing:.3px;text-transform:uppercase}
+.rc-dial.mudo .rc-num{opacity:.35}.rc-dial.mudo .rc-et{color:#EF4444}
+.rc-fila{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:10px;margin:14px 0 12px}
+.rc-b{height:56px;border-radius:999px;border:1px solid var(--rc-line);background:var(--rc-btn);color:var(--rc-tx);
+ font-family:inherit;font-size:15.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:var(--rc-sh);transition:transform .12s}
+.rc-b:active{transform:scale(.95)}.rc-b svg{width:18px;height:18px}
+.rc-b.p{color:#fff;border:0;background:linear-gradient(135deg,#3B82F6,#1D4ED8);box-shadow:0 8px 22px rgba(37,99,235,.45),inset 0 1px 0 rgba(255,255,255,.3)}
+.rc.osc .rc-b.p,[data-theme=dark] .rc-b.p{background:linear-gradient(135deg,#1E40AF,#1E3A8A);box-shadow:0 0 0 1.5px #60A5FA,0 0 18px rgba(96,165,250,.45)}
+.rc-wifi{width:100%;height:54px;border-radius:999px;border:1px solid var(--rc-line);background:var(--rc-btn);color:var(--rc-tx);
+ font-family:inherit;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:var(--rc-sh);position:relative;margin-bottom:14px}
+.rc-wifi svg{width:22px;height:22px;color:var(--rc-acc)}.rc-wifi .ch{position:absolute;right:18px;width:16px;height:16px;color:var(--rc-sub)}
+.rc-favs{padding:12px 10px 8px}
+.rc-favs h3{display:flex;align-items:center;gap:8px;margin:2px 6px 10px;font-size:17px;font-weight:650}
+.rc-favs h3 svg{width:20px;height:20px;color:#FACC15}
+.rc-f{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;margin-bottom:8px;border-radius:16px;
+ border:1px solid var(--rc-line);background:var(--rc-btn);color:var(--rc-tx);font-family:inherit;font-size:15.5px;font-weight:500;text-align:left;transition:transform .12s}
+.rc-f:active{transform:scale(.98)}
+.rc-f.on{border-color:var(--rc-acc);box-shadow:0 0 0 1px var(--rc-acc),0 6px 18px rgba(37,99,235,.18)}
+.rc-lg{width:36px;height:36px;border-radius:10px;flex:none;display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff;overflow:hidden;background:#334155}
+.rc-lg img{width:100%;height:100%;object-fit:contain;background:#fff}
+.rc-f b{flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rc-f span{color:var(--rc-sub);font-size:12.5px}
+.rc-f span.rc-lg{color:#fff;font-size:13px}
+.rc-f .ok{width:24px;height:24px;border-radius:50%;background:var(--rc-acc);color:#fff;display:grid;place-items:center}
+.rc-f .ok svg{width:14px;height:14px}.rc-f .ch{width:16px;height:16px;color:var(--rc-sub)}
+.rc-vacio{color:var(--rc-sub);font-size:13.5px;padding:4px 8px 10px}
+.rc-msg{min-height:16px;text-align:center;font-size:12.5px;color:#EF4444;margin:-2px 0 4px}
+/* /RC-UI-CSS */
 
 .sec{margin:16px 0 6px 14px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--sub)}
 .foot{margin:6px 14px 0;font-size:12px;color:var(--sub)}
@@ -557,16 +624,54 @@ button.row:active{background:var(--card2)}
 <!-- ======================= CONTROL REMOTO (2.47.60) ======================= -->
 <section class="view" id="v-control">
   <div class="top"><button class="bk" data-atras><svg><use href="#i-back"/></svg>Inicio</button><div class="ttl">Control remoto</div><div class="rt"></div></div>
-  <h1 class="big">Control remoto</h1>
-  <div class="rc-now"><small id="rc-est">Conectando con tu PC…</small><b id="rc-canal">Relax y TV</b></div>
-  <div class="rc-pad">
-    <button class="g" data-rc="vol" data-n="-1" aria-label="Bajar volumen">−</button><button data-rc="mute">Silencio</button><button class="g" data-rc="vol" data-n="1" aria-label="Subir volumen">+</button>
-    <button data-rc="ant">◀ Canal</button><button class="p" data-rc="pausa">Pausa / ▶</button><button data-rc="sig">Canal ▶</button>
+  <!-- RC-UI-HTML -->
+<svg width="0" height="0" style="position:absolute">
+ <symbol id="rc-tv" viewBox="0 0 24 24"><path d="M3.5 7h17v11h-17z M8.5 3.5l3.5 3.5 3.5-3.5 M8 21h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><path d="M10.3 10.2v5.2l4.4-2.6z" fill="currentColor"/></symbol>
+ <symbol id="rc-vol" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6 M18 6.5a8 8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+ <symbol id="rc-mute" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5 M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+ <symbol id="rc-sol" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2" fill="currentColor"/><path d="M12 2.5v2.2 M12 19.3v2.2 M2.5 12h2.2 M19.3 12h2.2 M5.3 5.3l1.6 1.6 M17.1 17.1l1.6 1.6 M5.3 18.7l1.6-1.6 M17.1 6.9l1.6-1.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+ <symbol id="rc-menos" viewBox="0 0 24 24"><path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+ <symbol id="rc-mas" viewBox="0 0 24 24"><path d="M5 12h14 M12 5v14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+ <symbol id="rc-ant" viewBox="0 0 24 24"><path d="M16 5L7 12l9 7z" fill="currentColor"/></symbol>
+ <symbol id="rc-sig" viewBox="0 0 24 24"><path d="M8 5l9 7-9 7z" fill="currentColor"/></symbol>
+ <symbol id="rc-pau" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></symbol>
+ <symbol id="rc-wf" viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0 M5.5 12.3a9.5 9.5 0 0 1 13 0 M8.6 15.5a5 5 0 0 1 6.8 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="19" r="1.6" fill="currentColor"/></symbol>
+ <symbol id="rc-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+ <symbol id="rc-star" viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.2l-5.7 3.1 1.2-6.4-4.7-4.4 6.4-.8z" fill="currentColor"/></symbol>
+ <symbol id="rc-ok" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+<div class="rc" id="rc">
+ <div class="rc-card rc-head"><div class="rc-ico"><svg><use href="#rc-tv"/></svg></div>
+  <div class="rc-ht"><b>Control remoto</b><span id="rc-sub">Conectando con tu PC…</span></div>
+  <div class="rc-pill" id="rc-pill"><i></i><span>Conectando</span></div></div>
+ <div class="rc-seg" id="rc-seg"><div class="rc-sl"></div>
+  <button class="on" data-modo="vol"><svg><use href="#rc-vol"/></svg>Volumen</button>
+  <button data-modo="brillo"><svg><use href="#rc-sol"/></svg>Brillo</button></div>
+ <div class="rc-zona">
+  <div class="rc-lado"><button class="rc-red" data-rc-paso="-1" aria-label="Bajar"><svg><use href="#rc-menos"/></svg></button><span id="rc-lm">Bajar</span></div>
+  <div class="rc-dial" id="rc-dial"><div class="rc-bez"></div>
+   <svg class="rc-arc" viewBox="0 0 240 240"><defs>
+     <linearGradient id="rcG" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#2563EB"/><stop offset=".6" stop-color="#3B82F6"/><stop offset="1" stop-color="#22D3EE"/></linearGradient>
+     <filter id="rcBr" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3.2"/></filter></defs>
+    <g id="rc-ticks"></g>
+    <circle cx="120" cy="120" r="104" fill="none" stroke="var(--rc-tick)" stroke-width="7" stroke-linecap="round" id="rc-pista"/>
+    <circle cx="120" cy="120" r="104" fill="none" stroke="url(#rcG)" stroke-width="9" stroke-linecap="round" id="rc-brillo" filter="url(#rcBr)" opacity=".75"/>
+    <circle cx="120" cy="120" r="104" fill="none" stroke="url(#rcG)" stroke-width="7" stroke-linecap="round" id="rc-prog"/>
+    <circle r="9" fill="#fff" stroke="#3B82F6" stroke-width="3" id="rc-perilla" style="filter:drop-shadow(0 0 6px rgba(59,130,246,.8))"/>
+   </svg>
+   <div class="rc-face"><svg id="rc-fi"><use href="#rc-vol"/></svg><div class="rc-num"><span id="rc-n">—</span><small>%</small></div><div class="rc-et" id="rc-et">Volumen</div></div>
   </div>
-  <button class="btn gray hide" id="rc-wifi" style="margin:6px 0 4px">Modo rápido (misma WiFi)</button>
-  <p class="foot" id="rc-nota" style="margin:0 0 10px"></p>
-  <div class="sec" style="margin-left:2px">Favoritos</div>
-  <div id="rc-favs"></div>
+  <div class="rc-lado"><button class="rc-red" data-rc-paso="1" aria-label="Subir"><svg><use href="#rc-mas"/></svg></button><span id="rc-lM">Subir</span></div>
+ </div>
+ <div style="display:flex;justify-content:center"><div class="rc-lado"><button class="rc-red" id="rc-mute" aria-label="Silencio" style="width:50px;height:50px"><svg style="width:22px;height:22px"><use href="#rc-mute"/></svg></button><span>Silencio</span></div></div>
+ <div class="rc-msg" id="rc-msg"></div>
+ <div class="rc-fila"><button class="rc-b" data-rc="ant"><svg><use href="#rc-ant"/></svg>Canal</button>
+  <button class="rc-b p" data-rc="pausa"><svg><use href="#rc-pau"/></svg>Pausa</button>
+  <button class="rc-b" data-rc="sig">Canal<svg><use href="#rc-sig"/></svg></button></div>
+ <button class="rc-wifi" id="rc-wifi" style="display:none"><svg><use href="#rc-wf"/></svg>Modo rápido (misma WiFi)<svg class="ch"><use href="#rc-chev"/></svg></button>
+ <div class="rc-card rc-favs"><h3><svg><use href="#rc-star"/></svg>Favoritos</h3><div id="rc-lista"></div></div>
+</div>
+<!-- /RC-UI-HTML -->
 </section>
 
 <!-- ======================= AVISOS ======================= -->

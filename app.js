@@ -5,7 +5,7 @@
      clave   = sha256("jasan-movil-k|"+t) → AES-256-GCM; blob = nonce12 | cifrado | tag16
      rutas   movil/<caja>/pedidos/<id>.bin · resultados/<id>.bin · pc.bin · anulado            */
 "use strict";
-const VERSION = "1.8 (JASAN 2.47.60)";
+const VERSION = "1.9 (JASAN 2.47.61)";
 const BUCKET = "jasan", TOPE_MB = 15, VIVO_SEG = 90;
 const $ = (q, el = document) => el.querySelector(q);
 const $$ = (q, el = document) => [...el.querySelectorAll(q)];
@@ -210,14 +210,136 @@ document.addEventListener("click", e => {
   const tb = e.target.closest("[data-tab]"); if (tb) UI.ver(tb.dataset.tab);
 });
 
-// ---------------------------------------------------------------- control remoto (2.47.60)
+// ---------------------------------------------------------------- control remoto (2.47.61)
 /* Órdenes en movil/<caja>/control.bin (cifrado): {cmds:[{id,t,c,n,arg}]} — las últimas 25.
-   La PC responde en control_pc.bin: canal, favoritos, enlace del modo rápido (WiFi). */
-const RC = { cmds: [], t: null, ult: "", lan: "", envio: null, rep: null, pend: 0 };
+   La PC responde en control_pc.bin: canal, favoritos, volumen, brillo y enlace del modo rápido (WiFi).
+   El diseño (perilla, botones, favoritos) sale de app/control_ui.py → tools_dev/rc_sync.py. */
+/* RC-UI-JS */
+const RCUI = (() => {
+  const q = s => document.querySelector(s);
+  const R = 104, CIRC = 2 * Math.PI * R, ARCO = 270, LARGO = CIRC * ARCO / 360;
+  let st = {}, modo = "vol", enviar = () => {}, local = { vol: 0, brillo: 0 }, tiro = 0, rep = null, ultimo = -1;
+  const COLORES = ["#2563EB", "#7C3AED", "#DC2626", "#059669", "#D97706", "#0891B2", "#DB2777", "#4F46E5"];
+  const escH = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  // brillo del video va de 50 a 200 %; lo demás de 0 a 100
+  const rango = () => (modo === "brillo" && st.brillo_de === "video") ? [50, 200] : [0, 100];
+  const valor = () => modo === "vol" ? st.vol : st.brillo;
+  function frac(v) { const [a, b] = rango(); return v == null ? 0 : Math.max(0, Math.min(1, (v - a) / (b - a))); }
+  function ticks() {
+    const g = q("#rc-ticks"); if (!g || g.childElementCount) return;
+    for (let i = 0; i <= 36; i++) {
+      const ang = (135 + i * ARCO / 36) * Math.PI / 180, r1 = 92, r2 = i % 6 ? 87 : 84;
+      const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      l.setAttribute("x1", 120 + r1 * Math.cos(ang)); l.setAttribute("y1", 120 + r1 * Math.sin(ang));
+      l.setAttribute("x2", 120 + r2 * Math.cos(ang)); l.setAttribute("y2", 120 + r2 * Math.sin(ang));
+      l.setAttribute("stroke-width", i % 6 ? 1.6 : 2.4); l.setAttribute("stroke-linecap", "round"); l.dataset.f = i / 36; g.appendChild(l);
+    }
+    for (const c of ["#rc-pista", "#rc-prog", "#rc-brillo"]) { const e = q(c); e.setAttribute("transform", "rotate(135 120 120)"); }
+    q("#rc-pista").setAttribute("stroke-dasharray", `${LARGO} ${CIRC}`);
+  }
+  function dial(v) {
+    const f = frac(v), largo = Math.max(0.001, f * LARGO);
+    for (const c of ["#rc-prog", "#rc-brillo"]) q(c).setAttribute("stroke-dasharray", `${v == null ? 0 : largo} ${CIRC}`);
+    const ang = (135 + f * ARCO) * Math.PI / 180, p = q("#rc-perilla");
+    p.setAttribute("cx", 120 + R * Math.cos(ang)); p.setAttribute("cy", 120 + R * Math.sin(ang)); p.style.opacity = v == null ? 0 : 1;
+    q("#rc-ticks").querySelectorAll("line").forEach(l => l.setAttribute("stroke", v != null && +l.dataset.f <= f + 1e-6 ? "#3B82F6" : "var(--rc-tick)"));
+    q("#rc-n").textContent = v == null ? "—" : Math.round(v);
+    q(".rc-bez").style.setProperty("--rc-g", (f * ARCO) + "deg");
+  }
+  function cabecera() {
+    const viva = st.t && (Date.now() / 1000 - st.t) < 600;
+    const pill = q("#rc-pill"); pill.classList.toggle("ok", !!viva);
+    pill.querySelector("span").textContent = viva ? (st._wifi ? "WiFi" : "Conectado") : "Sin conexión";
+    q("#rc-sub").textContent = !viva ? "Abre JASAN en tu PC" :
+      (st.viendo ? "En vivo en tu PC" : st.canal ? "Detenido" : "Elige un favorito") + (st.canal ? " · " + st.canal : "");
+  }
+  function pintarModo() {
+    q("#rc-seg").classList.toggle("b", modo === "brillo");
+    q("#rc-seg").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.modo === modo));
+    q("#rc-fi").innerHTML = `<use href="#${modo === "vol" ? (st.mute ? "rc-mute" : "rc-vol") : "rc-sol"}"/>`;
+    const sinBrillo = modo === "brillo" && st.brillo_de === "no";
+    q("#rc-et").textContent = modo === "vol" ? (st.mute ? "Silencio" : "Volumen") :
+      sinBrillo ? "No disponible" : st.brillo_de === "video" ? "Brillo del video" : "Brillo";
+    q("#rc-dial").classList.toggle("mudo", modo === "vol" && !!st.mute);
+    q("#rc-mute").classList.toggle("on", !!st.mute);
+    dial(valor());
+  }
+  function lista() {
+    const el = q("#rc-lista"); el.innerHTML = "";
+    if (!st.tv) { el.innerHTML = '<p class="rc-vacio">Relax y TV no está activo en tu PC.</p>'; return; }
+    if (st.cargando) { el.innerHTML = '<p class="rc-vacio">Tu PC está cargando los canales…</p>'; return; }
+    if (!(st.favs || []).length) { el.innerHTML = '<p class="rc-vacio">Aún no tienes favoritos. En Relax y TV de la PC toca la ★ de un canal.</p>'; return; }
+    st.favs.forEach((f, i) => {
+      const b = document.createElement("button"), on = f.k === st.clave;
+      b.className = "rc-f" + (on ? " on" : "");
+      const ini = escH(f.n.replace(/[^A-Za-z0-9ÁÉÍÓÚÑáéíóúñ ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join("").toUpperCase() || "TV");
+      b.innerHTML = `<span class="rc-lg" style="background:${COLORES[i % COLORES.length]}">${f.l ? `<img alt="" src="${escH(f.l)}">` : ini}</span>` +
+        `<b>${escH(f.n)}</b><span>${escH(f.p || "")}</span>` + (on ? '<i class="ok"><svg><use href="#rc-ok"/></svg></i>' : '<svg class="ch"><use href="#rc-chev"/></svg>');
+      const img = b.querySelector("img"); if (img) img.onerror = () => { img.parentNode.textContent = ini; };
+      b.onclick = () => { st.clave = f.k; st.canal = f.n; lista(); cabecera(); enviar("canal", { arg: f.k }); };
+      el.appendChild(b);
+    });
+  }
+  function pintar(d) {
+    const ahora = Date.now();
+    const v0 = st.vol, b0 = st.brillo, m0 = st.mute;
+    st = Object.assign({}, d, { _wifi: d._wifi });
+    if (ahora - local.vol < 2500) { st.vol = v0; st.mute = m0; }       // lo que mueve el dedo manda por un momento
+    if (ahora - local.brillo < 2500) st.brillo = b0;
+    cabecera(); pintarModo(); lista();
+    const m = q("#rc-msg"); m.textContent = d.res && !["ok", "cargando"].includes(d.res) ? d.res : "";
+  }
+  function cambiar(nuevo, fijar) {
+    const [a, b] = rango(); nuevo = Math.max(a, Math.min(b, Math.round(nuevo)));
+    if (modo === "vol") { st.vol = nuevo; if (nuevo > 0) st.mute = false; local.vol = Date.now(); }
+    else { st.brillo = nuevo; local.brillo = Date.now(); }
+    pintarModo();
+    if (Math.round(nuevo / 2) !== ultimo) { ultimo = Math.round(nuevo / 2); try { navigator.vibrate && navigator.vibrate(4); } catch (e) {} }
+    if (fijar) enviar(modo === "vol" ? "vol_set" : "brillo_set", { arg: nuevo });
+  }
+  function paso(n) {
+    const v = valor();
+    if (v == null) { enviar(modo === "vol" ? "vol" : "brillo", { n }); return; }   // sin % conocido: por pasos
+    const d = modo === "vol" ? 2 : 10;
+    cambiar(v + n * d, false);
+    enviar(modo === "vol" ? "vol" : "brillo", { n });
+  }
+  function init(fn) {
+    enviar = fn; ticks(); dial(null);
+    q("#rc-seg").querySelectorAll("button").forEach(b => b.onclick = () => { modo = b.dataset.modo; pintarModo(); });
+    document.querySelectorAll("[data-rc-paso]").forEach(b => {
+      const n = +b.dataset.rcPaso;
+      b.addEventListener("pointerdown", e => { e.preventDefault(); paso(n); clearInterval(rep); rep = setInterval(() => paso(n), 230); });
+      ["pointerup", "pointerleave", "pointercancel"].forEach(ev => b.addEventListener(ev, () => clearInterval(rep)));
+    });
+    q("#rc-mute").onclick = () => { st.mute = !st.mute; local.vol = Date.now(); pintarModo(); enviar("mute"); };
+    document.querySelectorAll("[data-rc]").forEach(b => b.onclick = () => enviar(b.dataset.rc));
+    // perilla: se gira con el dedo (el ángulo fija el %)
+    const d = q("#rc-dial"); let girando = false, movio = false;
+    const porAngulo = e => {
+      const r = d.getBoundingClientRect(), x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
+      let ang = Math.atan2(y, x) * 180 / Math.PI, rel = (ang - 135 + 720) % 360;
+      if (rel > ARCO) rel = rel > ARCO + (360 - ARCO) / 2 ? 0 : ARCO;
+      const [a, b] = rango(); return a + (b - a) * rel / ARCO;
+    };
+    d.addEventListener("pointerdown", e => { if (modo === "brillo" && st.brillo_de === "no") return; girando = true; movio = false; d.setPointerCapture(e.pointerId); });
+    d.addEventListener("pointermove", e => {
+      if (!girando) return; movio = true; cambiar(porAngulo(e), false);
+      if (Date.now() - tiro > 160) { tiro = Date.now(); enviar(modo === "vol" ? "vol_set" : "brillo_set", { arg: Math.round(valor()) }); }
+    });
+    const fin = e => { if (!girando) return; girando = false; if (movio) cambiar(porAngulo(e), true); };
+    d.addEventListener("pointerup", fin); d.addEventListener("pointercancel", () => { girando = false; });
+  }
+  return { init, pintar, estado: () => st };
+})();
+/* /RC-UI-JS */
+const RC = { cmds: [], t: null, lan: "", envio: null };
+const RC_SUMA = ["vol", "brillo"], RC_FIJA = ["vol_set", "brillo_set"];
 function rcOrden(c, extra = {}) {
-  if (c === "vol" && RC.cmds.length) {                // volumen seguido: se suma a la última orden aún no enviada
-    const u = RC.cmds[RC.cmds.length - 1];
-    if (u.c === "vol" && !u.ida && Math.sign(u.n) === Math.sign(extra.n)) { u.n += extra.n; return rcEnviar(); }
+  const u = RC.cmds[RC.cmds.length - 1];
+  if (u && !u.ida && u.c === c) {                       // lo seguido se junta con la orden aún no enviada
+    if (RC_SUMA.includes(c) && Math.sign(u.n) === Math.sign(extra.n)) { u.n += extra.n; return rcEnviar(); }
+    if (RC_FIJA.includes(c)) { u.arg = extra.arg; u.t = Date.now(); return rcEnviar(); }
   }
   RC.cmds.push({ id: nuevoId(), t: Date.now(), c, ...extra });
   RC.cmds = RC.cmds.slice(-25);
@@ -227,32 +349,18 @@ function rcEnviar() {                                  // juntar los toques de ~
   clearTimeout(RC.envio);
   RC.envio = setTimeout(async () => {
     RC.cmds.forEach(x => x.ida = true);
-    try { await Nube.put(ruta("control.bin"), await cifrar({ cmds: RC.cmds.map(({ ida, ...x }) => x) }));
-      $("#rc-est").textContent = "Enviado a tu PC…"; rcPedirEstado(true); }
+    try { await Nube.put(ruta("control.bin"), await cifrar({ cmds: RC.cmds.map(({ ida, ...x }) => x) })); rcPedirEstado(true); }
     catch (e) { UI.toast(navigator.onLine ? "No se pudo enviar" : "Sin internet"); }
   }, 150);
 }
 async function rcEstado() {
   try {
     const b = await Nube.get(ruta("control_pc.bin"));
-    if (!b) return;
+    if (!b) return RCUI.pintar({ t: 0 });
     const d = await descifrar(b);
-    const vivo = (Date.now() / 1000 - (d.t || 0)) < 600;
-    $("#rc-canal").textContent = d.canal || "Relax y TV";
-    $("#rc-est").textContent = !vivo ? "Tu PC aún no responde (abre JASAN)" : d.viendo ? "En vivo en tu PC" : (d.canal ? "Detenido" : "Elige un favorito");
-    RC.lan = d.lan || ""; $("#rc-wifi").classList.toggle("hide", !RC.lan);
-
-    const el = $("#rc-favs"); el.innerHTML = "";
-    if (!d.tv) { el.innerHTML = '<p class="lead">Relax y TV no está activo en tu PC.</p>'; return; }
-    if (d.cargando) { el.innerHTML = '<p class="lead">Tu PC está cargando los canales…</p>'; return; }
-    if (!(d.favs || []).length) { el.innerHTML = '<p class="lead">Aún no tienes favoritos. En Relax y TV de la PC toca la ★ de un canal.</p>'; return; }
-    for (const f of d.favs) {
-      const b = document.createElement("button"); b.className = "rc-fav" + (f.k === d.clave ? " on" : "");
-      b.innerHTML = `${esc(f.n)}<span>${esc(f.p || "")}</span>`;
-      b.onclick = () => { $$(".rc-fav").forEach(x => x.classList.remove("on")); b.classList.add("on"); $("#rc-canal").textContent = f.n; rcOrden("canal", { arg: f.k }); };
-      el.appendChild(b);
-    }
-  } catch (e) { $("#rc-est").textContent = navigator.onLine ? "No se pudo consultar a tu PC" : "Sin internet"; }
+    RC.lan = d.lan || ""; $("#rc-wifi").style.display = RC.lan ? "" : "none";
+    RCUI.pintar(d);
+  } catch (e) { RCUI.pintar({ t: 0, res: navigator.onLine ? "No se pudo consultar a tu PC" : "Sin internet" }); }
 }
 function rcPedirEstado(pronto) {                       // tras una orden: mirar la respuesta de la PC en 1.5 y 4 s
   if (pronto) { setTimeout(rcEstado, 1500); setTimeout(rcEstado, 4000); }
@@ -262,15 +370,8 @@ function abrirControl() {
   rcOrden("hola");                                     // la PC se pone «rápida» antes del primer botón
   rcEstado(); clearInterval(RC.t); RC.t = setInterval(rcEstado, 5000);
 }
-function pararControl() { clearInterval(RC.t); RC.t = null; clearInterval(RC.rep); }
-$$("[data-rc]").forEach(b => {
-  const c = b.dataset.rc, n = Number(b.dataset.n || 0);
-  const una = () => c === "vol" ? rcOrden("vol", { n }) : rcOrden(c);
-  if (c === "vol") {                                   // mantener apretado: sigue subiendo / bajando
-    b.addEventListener("pointerdown", e => { e.preventDefault(); una(); clearInterval(RC.rep); RC.rep = setInterval(una, 250); });
-    ["pointerup", "pointerleave", "pointercancel"].forEach(ev => b.addEventListener(ev, () => clearInterval(RC.rep)));
-  } else b.onclick = una;
-});
+function pararControl() { clearInterval(RC.t); RC.t = null; }
+RCUI.init((c, extra) => rcOrden(c, extra || {}));
 $("#rc-wifi").onclick = () => { if (RC.lan) location.href = RC.lan; };
 
 // ---------------------------------------------------------------- estado de la PC
